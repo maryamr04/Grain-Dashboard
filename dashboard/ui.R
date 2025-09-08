@@ -5,8 +5,9 @@ library(shinycssloaders)
 
 # Years + categories
 years <- 2020:2025
-categories <- c("PLANTED", "EMERGED", "BLOOMING", 
-                "SETTING PODS", "DROPPING LEAVES", "HARVESTED")
+categories <- c("PCT PLANTED", "PCT EMERGED", "PCT BLOOMING",
+                "PCT SETTING PODS", "PCT DROPPING LEAVES", "PCT HARVESTED")
+
 
 ui <- fluidPage(
   # Custom CSS

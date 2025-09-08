@@ -1,28 +1,17 @@
-# functions.R
+#functions.r
 library(rnassqs)
 library(dplyr)
 library(lubridate)
 
-# Map friendly category names to USDA API short_desc values
-soy_category_map <- list(
-  "PLANTED"         = "SOYBEANS - PROGRESS, MEASURED IN PCT PLANTED",
-  "EMERGED"         = "SOYBEANS - PROGRESS, MEASURED IN PCT EMERGED",
-  "BLOOMING"        = "SOYBEANS - PROGRESS, MEASURED IN PCT BLOOMING",
-  "SETTING PODS"    = "SOYBEANS - PROGRESS, MEASURED IN PCT SETTING PODS",
-  "DROPPING LEAVES" = "SOYBEANS - PROGRESS, MEASURED IN PCT DROPPING LEAVES",
-  "HARVESTED"       = "SOYBEANS - PROGRESS, MEASURED IN PCT HARVESTED"
-)
-
-# Helper: clean stage titles for plotting
-clean_title <- function(cat) {
-  tools::toTitleCase(tolower(cat))
+# Helper: clean USDA short_desc into simpler labels for plotting
+clean_title <- function(desc) {
+  desc <- gsub("SOYBEANS - PROGRESS, MEASURED IN ", "", desc)
+  desc <- gsub("PCT ", "", desc)
+  tools::toTitleCase(tolower(desc))
 }
 
-# Get soybean progress for a year + category
-get_soy_progress_data <- function(year, category, state = "VIRGINIA") {
-  desc <- soy_category_map[[category]]
-  if (is.null(desc)) return(NULL)   # if mapping not found
-  
+# Get all available soybean categories for a given year
+get_soy_categories <- function(year, state = "VIRGINIA") {
   data <- tryCatch(
     nassqs(list(
       commodity_desc    = "SOYBEANS",
@@ -30,24 +19,69 @@ get_soy_progress_data <- function(year, category, state = "VIRGINIA") {
       state_name        = state,
       statisticcat_desc = "PROGRESS",
       unit_desc         = "PCT",
-      short_desc        = desc,
       agg_level_desc    = "STATE"
     )),
     error = function(e) return(NULL)
   )
   if (is.null(data) || nrow(data) == 0) return(NULL)
   
-  data <- data %>%
-    mutate(week = as.Date(week_ending)) %>%   # ✅ week_ending already a date
-    select(week, value = Value)
-  
-  return(data)
+  unique(data$short_desc)
 }
 
-# Get 5-year avg soybean progress
+# Get soybean progress for a year + USDA short_desc
+# ---- Data Functions ----
+get_soy_progress_data <- function(year, category, state = "VIRGINIA") {
+  tryCatch({
+    nassqs(list(
+      commodity_desc    = "SOYBEANS",
+      year              = year,
+      state_name        = state,
+      statisticcat_desc = "PROGRESS",
+      short_desc        = paste("SOYBEANS - PROGRESS, MEASURED IN", category),
+      agg_level_desc    = "STATE"
+    )) %>%
+      mutate(
+        week = as.Date(week_ending, tryFormats = c("%m/%d/%Y", "%Y-%m-%d")),
+        value = as.numeric(Value),
+        Category = clean_title(category),
+        Year = year
+      ) %>%
+      filter(!is.na(week))
+  }, error = function(e) NULL)
+}
+
 get_soy_avg_data <- function(year, category, state = "VIRGINIA") {
+  tryCatch({
+    years <- (year - 5):(year - 1)
+    data <- lapply(years, function(y) {
+      nassqs(list(
+        commodity_desc    = "SOYBEANS",
+        year              = y,
+        state_name        = state,
+        statisticcat_desc = "PROGRESS",
+        short_desc        = paste("SOYBEANS - PROGRESS, MEASURED IN", category),
+        agg_level_desc    = "STATE"
+      ))
+    })
+    data <- bind_rows(data)
+    if (nrow(data) == 0) return(NULL)
+    
+    data %>%
+      mutate(
+        week = as.Date(week_ending, tryFormats = c("%m/%d/%Y", "%Y-%m-%d")),
+        value = as.numeric(Value),
+        Category = clean_title(category),
+        Year = year
+      ) %>%
+      group_by(week) %>%
+      summarise(value = mean(value, na.rm = TRUE), .groups = "drop")
+  }, error = function(e) NULL)
+}
+
+# Get 5-year avg soybean progress (using USDA short_desc)
+get_soy_avg_data <- function(year, short_desc, state = "VIRGINIA") {
   years <- (year - 5):(year - 1)
-  data <- lapply(years, function(y) get_soy_progress_data(y, category, state))
+  data <- lapply(years, function(y) get_soy_progress_data(y, short_desc, state))
   data <- bind_rows(data)
   if (nrow(data) == 0) return(NULL)
   

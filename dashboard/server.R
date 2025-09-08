@@ -6,12 +6,10 @@ library(ggplot2)
 
 server <- function(input, output, session) {
   years <- 2020:2025
-  categories <- c(
-    "PCT SEEDBED PREPARED", "PCT PLANTED", "PCT EMERGED",
-    "PCT BLOOMING", "PCT SETTING PODS", "PCT FULLY PODDED",
-    "PCT COLORING", "PCT MATURE", "PCT DROPPING LEAVES",
-    "PCT HARVESTED"
-  )
+  categories <- c("PCT PLANTED", "PCT EMERGED", "PCT BLOOMING",
+                  "PCT SETTING PODS", "PCT DROPPING LEAVES", "PCT HARVESTED")
+  
+  
   
   for (yr in years) {
     for (cat in categories) {
