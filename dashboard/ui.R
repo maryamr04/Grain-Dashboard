@@ -1,78 +1,125 @@
 # ui.R
-# Purpose: Defines the visual layout and inputs/outputs for the app.
 library(shiny)
-library(bslib)
+library(plotly)
+library(shinycssloaders)
 
-# ---- Theme ----
-grain_theme <- bs_theme(
-  version      = 5,
-  base_font    = "Times New Roman, serif",
-  heading_font = "Times New Roman, serif",
-  bg           = "#F5E6D3",  # light tan background
-  fg           = "#1F2A32",
-  primary      = "#2E6B3B",  # dark green
-  secondary    = "#4B2E2B"   # dark brown
-)
+# Years + categories
+years <- 2020:2025
+categories <- c("PLANTED", "EMERGED", "BLOOMING", 
+                "SETTING PODS", "DROPPING LEAVES", "HARVESTED")
 
-ui <- page(
-  theme = grain_theme,
+ui <- fluidPage(
+  # Custom CSS
+  tags$head(tags$style(HTML("
+      body { background-color: #F3E5D0 !important; }
+
+      .title-box {
+        background:#4B2E2B; color:#FDFBF7;
+        padding:25px; text-align:center;
+        margin-bottom:20px; border-bottom:3px solid #3E2C23;
+        box-shadow:0 4px 10px rgba(0,0,0,0.25);
+      }
+      .title-box h1 {
+        margin:0; font-size:40px;
+        font-family:'Times New Roman', serif; font-weight:700;
+      }
+      .title-box h4 {
+        margin-top:6px; font-size:18px;
+        font-family:'Times New Roman', serif; font-style:italic;
+        color:#EADBC8; font-weight:400;
+      }
+
+      /* Sidebar nav buttons */
+      .nav-pills > li > a {
+        background-color:#4B2E2B; color:#FDFBF7;
+        font-family:'Times New Roman', serif;
+        font-weight:bold; border-radius:6px;
+        margin-bottom:8px; padding:12px;
+        transition:all 0.2s ease-in-out;
+        border:1px solid #3E2C23;
+      }
+      .nav-pills > li.active > a {
+        background-color:#3E2C23 !important; color:#FDFBF7 !important;
+      }
+      .nav-pills > li > a:hover {
+        background-color:#6B4226; color:white;
+      }
+
+      /* Tab content panels */
+      .tab-content > .tab-pane {
+        background-color:#4B2E2B; color:#FDFBF7;
+        border:1px solid #3E2C23; border-radius:6px;
+        padding:20px; margin-top:15px;
+        box-shadow:0 3px 8px rgba(0,0,0,0.2);
+      }
+      .tab-content h2, .tab-content h3, .tab-content h4 {
+        color:#FDFBF7; font-family:'Times New Roman', serif; font-weight:700;
+      }
+      .tab-content p {
+        font-family:'Times New Roman', serif;
+        font-size:16px; color:#FDFBF7;
+      }
+      
+      /* Sidebar container */
+.nav-pills {
+  background-color: #F3E5D0 !important;  /* match body background */
+  border-right: 2px solid #3E2C23;       /* subtle dark divider */
+  padding: 10px;
+}
+
+/* Sidebar list items */
+.nav-pills > li {
+  margin-bottom: 8px;
+}
+
+  "))),
   
-  # ---- Title banner ----
-  div(
-    style = "
-      background:#4B2E2B;
-      color:#FDFBF7;
-      padding:30px 20px;
-      text-align:center;
-      margin-bottom:20px;
-    ",
-    tags$h1("🌾 Grain Interactive Dashboard",
-            style="margin:0; font-size:42px; font-family:'Times New Roman'; font-weight:700;"),
-    tags$h4("A tool brought to you by the Virginia Tech Kohl Centre",
-            style="margin-top:8px; font-size:20px; font-family:'Times New Roman';
-                   font-style:italic; color:#EADBC8; font-weight:400;")
+  # Title
+  div(class = "title-box",
+      h1("🌱 Soybean Interactive Dashboard"),
+      h4("A tool brought to you by the Virginia Tech Kohl Centre")
   ),
   
-  # ---- Collapsible Sidebar Navigation ----
-  navset_sidebar(
-    id = "main_tabs",
-    sidebar = sidebar(title = "Navigation", open = "open", width = 260),
+  # Sidebar navigation
+  navlistPanel(
+    widths = c(2, 10),
     
-    # ---------- HOME TAB ----------
-    nav_panel(
-      "Home",
-      layout_columns(
-        col_widths = c(6, 6),
-        div(
-          style = "background-color:#FFFFFF;
-                   border-radius:12px; padding:20px; margin:20px;
-                   box-shadow:0 2px 6px rgba(0,0,0,0.15);",
-          h3("Project Overview"),
-          p("This dashboard provides an interactive interface to explore grain-related data — 
-             covering planting progress, crop conditions, yields, and remote sensing."),
-          tags$hr(),
-          tags$strong("Made by: Virginia Tech Kohl Centre")
-        ),
-        div(
-          style = "background-color:#FFFFFF;
-                   border-radius:12px; padding:20px; margin:20px;
-                   box-shadow:0 2px 6px rgba(0,0,0,0.15);",
-          h3("Data Notes"),
-          tags$ul(
-            tags$li("Updated regularly from USDA NASS API"),
-            tags$li("Covers Virginia, Maryland, and North Carolina"),
-            tags$li("Historical data from 2000–present"),
-            tags$li("Future expansion: NDVI & temperature from remote sensing")
-          )
-        )
-      )
+    # Objective
+    tabPanel("Objective",
+             h2("🌱 Welcome"),
+             p("Explore soybean planting progress (2020–2025) across stages, 
+         compared to 5-year averages. Data is from the USDA NASS API.")
     ),
     
-    # ---------- OTHER PLACEHOLDERS ----------
-    nav_panel("Planting Progress", h3("Planting Progress (Placeholder)")),
-    nav_panel("Crop Conditions", h3("Crop Conditions (Placeholder)")),
-    nav_panel("Yield Trends", h3("Yield Trends (Placeholder)")),
-    nav_panel("Remote Sensing", h3("Remote Sensing (Placeholder)")),
-    nav_panel("About", h3("About (Placeholder)"))
+    # Planting Progress
+    tabPanel("Planting Progress",
+             h3("🌱 Planting Progress"),
+             do.call(tabsetPanel, c(
+               id = "year_tabs",
+               lapply(years, function(yr) {
+                 tabPanel(
+                   title = paste(yr),
+                   lapply(categories, function(cat) {
+                     safe_id <- paste0("soy_progress_", yr, "_", gsub("[^A-Za-z]", "_", cat))
+                     tagList(
+                       h4(paste(cat, "—", yr)),
+                       withSpinner(
+                         plotlyOutput(safe_id, height = "300px"),
+                         type = 4, color = "#FDFBF7", size = 0.7
+                       ),
+                       br()
+                     )
+                   })
+                 )
+               })
+             ))
+    ),
+    
+    # Placeholders
+    tabPanel("Crop Conditions", h3("🌾 Crop Conditions (Placeholder)")),
+    tabPanel("Yield Trends",    h3("📈 Yield Trends (Placeholder)")),
+    tabPanel("Remote Sensing",  h3("🛰️ Remote Sensing (Placeholder)")),
+    tabPanel("About",           h3("ℹ️ About (Placeholder)"))
   )
 )
+
