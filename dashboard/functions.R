@@ -1,16 +1,16 @@
-#functions.r
-library(rnassqs)
-library(dplyr)
-library(lubridate)
+# ====================================================================
+# functions.R
+# ====================================================================
+library(rnassqs)   
+library(dplyr)     
+library(lubridate) 
 
-# Helper: clean USDA short_desc into simpler labels for plotting
+# Data Cleaning 
 clean_title <- function(desc) {
   desc <- gsub("SOYBEANS - PROGRESS, MEASURED IN ", "", desc)
   desc <- gsub("PCT ", "", desc)
-  tools::toTitleCase(tolower(desc))
+  tools::toTitleCase(tolower(desc))  
 }
-
-# Get all available soybean categories for a given year
 get_soy_categories <- function(year, state = "VIRGINIA") {
   data <- tryCatch(
     nassqs(list(
@@ -28,66 +28,56 @@ get_soy_categories <- function(year, state = "VIRGINIA") {
   unique(data$short_desc)
 }
 
-# Get soybean progress for a year + USDA short_desc
-# ---- Data Functions ----
+# ====================================================================
+# Planting Progress Data (2020–2025)
+# ====================================================================
+soy_history <- read.csv("soybean_progress_fixed.csv", stringsAsFactors = FALSE) %>%
+  mutate(
+    Year  = as.integer(Year),
+    week  = as.Date(week),
+    value = as.numeric(value)
+  )
+
+# ---- Combined (CSV for 2020–2024, API for 2025) ----
 get_soy_progress_data <- function(year, category, state = "VIRGINIA") {
   tryCatch({
-    nassqs(list(
-      commodity_desc    = "SOYBEANS",
-      year              = year,
-      state_name        = state,
-      statisticcat_desc = "PROGRESS",
-      short_desc        = paste("SOYBEANS - PROGRESS, MEASURED IN", category),
-      agg_level_desc    = "STATE"
-    )) %>%
-      mutate(
-        week = as.Date(week_ending, tryFormats = c("%m/%d/%Y", "%Y-%m-%d")),
-        value = as.numeric(Value),
-        Category = clean_title(category),
-        Year = year
-      ) %>%
-      filter(!is.na(week))
-  }, error = function(e) NULL)
-}
-
-get_soy_avg_data <- function(year, category, state = "VIRGINIA") {
-  tryCatch({
-    years <- (year - 5):(year - 1)
-    data <- lapply(years, function(y) {
+    if (year %in% 2020:2024) {
+      soy_history %>%
+        filter(Year == year, CategoryRaw == trimws(category))
+    } else if (year == 2025) {
       nassqs(list(
         commodity_desc    = "SOYBEANS",
-        year              = y,
+        year              = 2025,
         state_name        = state,
         statisticcat_desc = "PROGRESS",
         short_desc        = paste("SOYBEANS - PROGRESS, MEASURED IN", category),
         agg_level_desc    = "STATE"
-      ))
-    })
-    data <- bind_rows(data)
-    if (nrow(data) == 0) return(NULL)
-    
-    data %>%
-      mutate(
-        week = as.Date(week_ending, tryFormats = c("%m/%d/%Y", "%Y-%m-%d")),
-        value = as.numeric(Value),
-        Category = clean_title(category),
-        Year = year
-      ) %>%
-      group_by(week) %>%
-      summarise(value = mean(value, na.rm = TRUE), .groups = "drop")
+      )) %>%
+        mutate(
+          week     = as.Date(week_ending, tryFormats = c("%m/%d/%Y", "%Y-%m-%d")),
+          value    = as.numeric(Value),
+          Category = clean_title(category),
+          Year     = 2025
+        ) %>%
+        filter(!is.na(week))
+    } else {
+      NULL
+    }
   }, error = function(e) NULL)
 }
 
-# Get 5-year avg soybean progress (using USDA short_desc)
-get_soy_avg_data <- function(year, short_desc, state = "VIRGINIA") {
-  years <- (year - 5):(year - 1)
-  data <- lapply(years, function(y) get_soy_progress_data(y, short_desc, state))
-  data <- bind_rows(data)
-  if (nrow(data) == 0) return(NULL)
-  
-  avg <- data %>%
-    group_by(week) %>%
-    summarise(value = mean(as.numeric(value), na.rm = TRUE), .groups = "drop")
-  
-  return(avg)
+# ---- 5-Year Average from CSV ----
+get_soy_avg_data <- function(year, category) {
+  tryCatch({
+    years <- (year - 5):(year - 1)
+    data <- soy_history %>%
+      filter(Year %in% years, CategoryRaw == trimws(category))
+    
+    if (nrow(data) == 0) return(NULL)
+    
+    data %>%
+      group_by(week) %>%
+      summarise(value = mean(value, na.rm = TRUE), .groups = "drop") %>%
+      mutate(Type = "5-Year Avg")
+  }, error = function(e) NULL)
 }

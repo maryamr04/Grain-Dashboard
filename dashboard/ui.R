@@ -1,19 +1,22 @@
+# ====================================================================
 # ui.R
+# ====================================================================
 library(shiny)
 library(plotly)
 library(shinycssloaders)
 
-# Years + categories
 years <- 2020:2025
 categories <- c("PCT PLANTED", "PCT EMERGED", "PCT BLOOMING",
                 "PCT SETTING PODS", "PCT DROPPING LEAVES", "PCT HARVESTED")
 
-
+# ====================================================================
+# Aesthetics / CSS Styling
+# ====================================================================
 ui <- fluidPage(
-  # Custom CSS
   tags$head(tags$style(HTML("
       body { background-color: #F3E5D0 !important; }
 
+      /* ---- Title Box ---- */
       .title-box {
         background:#4B2E2B; color:#FDFBF7;
         padding:25px; text-align:center;
@@ -30,7 +33,7 @@ ui <- fluidPage(
         color:#EADBC8; font-weight:400;
       }
 
-      /* Sidebar nav buttons */
+      /* ---- Sidebar Navigation Buttons ---- */
       .nav-pills > li > a {
         background-color:#4B2E2B; color:#FDFBF7;
         font-family:'Times New Roman', serif;
@@ -46,7 +49,7 @@ ui <- fluidPage(
         background-color:#6B4226; color:white;
       }
 
-      /* Tab content panels */
+      /* ---- Tab Content Panels ---- */
       .tab-content > .tab-pane {
         background-color:#4B2E2B; color:#FDFBF7;
         border:1px solid #3E2C23; border-radius:6px;
@@ -60,67 +63,101 @@ ui <- fluidPage(
         font-family:'Times New Roman', serif;
         font-size:16px; color:#FDFBF7;
       }
+
+      /* ---- Sidebar Container ---- */
+      .nav-pills {
+        background-color: transparent !important;
+        border: none !important;
+        padding: 10px;
+      }
       
-      /* Sidebar container */
-.nav-pills {
-  background-color: #F3E5D0 !important;  /* match body background */
-  border-right: 2px solid #3E2C23;       /* subtle dark divider */
-  padding: 10px;
+      /* Make tab titles white */
+.nav-tabs > li > a {
+  color: #FDFBF7 !important;
+  font-weight: bold;
+  font-family: 'Times New Roman', serif;
+}
+.nav-tabs > li.active > a {
+  color: #FDFBF7 !important;
+  background-color: #4B2E2B !important;
+  border: 1px solid #3E2C23 !important;
 }
 
-/* Sidebar list items */
-.nav-pills > li {
-  margin-bottom: 8px;
-}
 
+      /* ---- Sidebar List Items ---- */
+      .nav-pills > li {
+        margin-bottom: 8px;
+      }
   "))),
   
-  # Title
+  # ====================================================================
+  #  Title Section
+  # ====================================================================
   div(class = "title-box",
       h1("🌱 Soybean Interactive Dashboard"),
       h4("A tool brought to you by the Virginia Tech Kohl Centre")
   ),
   
-  # Sidebar navigation
+  
+  # ====================================================================
+  #  Sidebar Navigation
+  # ====================================================================
   navlistPanel(
     widths = c(2, 10),
     
-    # Objective
+    # ---- Objective Tab ----
     tabPanel("Objective",
              h2("🌱 Welcome"),
              p("Explore soybean planting progress (2020–2025) across stages, 
          compared to 5-year averages. Data is from the USDA NASS API.")
     ),
     
-    # Planting Progress
+    # ---- Planting Progress Tab ----
     tabPanel("Planting Progress",
-             h3("🌱 Planting Progress"),
-             do.call(tabsetPanel, c(
-               id = "year_tabs",
-               lapply(years, function(yr) {
-                 tabPanel(
-                   title = paste(yr),
-                   lapply(categories, function(cat) {
-                     safe_id <- paste0("soy_progress_", yr, "_", gsub("[^A-Za-z]", "_", cat))
-                     tagList(
-                       h4(paste(cat, "—", yr)),
-                       withSpinner(
-                         plotlyOutput(safe_id, height = "300px"),
-                         type = 4, color = "#FDFBF7", size = 0.7
-                       ),
-                       br()
-                     )
-                   })
-                 )
-               })
-             ))
+             h3(" Planting Progress"),
+             
+             # About this Data Info Box
+             div(style = "
+         background-color:#4B2E2B;
+         color:#FDFBF7;
+         font-family:'Times New Roman', serif;
+         padding:15px;
+         border-radius:8px;
+         margin-bottom:20px;
+         box-shadow:0 3px 8px rgba(0,0,0,0.2);
+       ",
+       h4("About this Data"),
+       p("This dashboard uses soybean planting progress and crop development data 
+          from the USDA NASS API. All percentages represent the share of soybean acres 
+          at each growth stage in Virginia.")
+             ),
+       
+       # Yearly Tabs (2020–2025)
+       # Year Tabs (2020–2025)
+       do.call(tabsetPanel, c(
+         id = "year_tabs",
+         lapply(years, function(yr) {
+           tabPanel(
+             title = paste(yr),
+             lapply(categories, function(cat) {
+               safe_id <- paste0("soy_progress_", yr, "_", gsub("[^A-Za-z]", "_", cat))
+               tagList(
+                 h4(paste(clean_title(cat), "—", yr)),
+                 withSpinner(
+                   plotlyOutput(safe_id, height = "300px"),
+                   type = 4, color = "#FDFBF7", size = 0.7
+                 ),
+                 br()
+               )
+             })
+           )
+         })
+       ))
     ),
-    
-    # Placeholders
+    # ---- Placeholder Tabs ----
     tabPanel("Crop Conditions", h3("🌾 Crop Conditions (Placeholder)")),
     tabPanel("Yield Trends",    h3("📈 Yield Trends (Placeholder)")),
     tabPanel("Remote Sensing",  h3("🛰️ Remote Sensing (Placeholder)")),
     tabPanel("About",           h3("ℹ️ About (Placeholder)"))
   )
 )
-
