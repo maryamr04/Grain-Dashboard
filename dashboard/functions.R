@@ -1,83 +1,118 @@
 # ====================================================================
 # functions.R
 # ====================================================================
-library(rnassqs)   
-library(dplyr)     
-library(lubridate) 
+library(rnassqs)
+library(dplyr)
+library(lubridate)
+library(tidyr)
 
-# Data Cleaning 
+# ------------------------- Helpers -----------------------------------
 clean_title <- function(desc) {
   desc <- gsub("SOYBEANS - PROGRESS, MEASURED IN ", "", desc)
   desc <- gsub("PCT ", "", desc)
-  tools::toTitleCase(tolower(desc))  
-}
-get_soy_categories <- function(year, state = "VIRGINIA") {
-  data <- tryCatch(
-    nassqs(list(
-      commodity_desc    = "SOYBEANS",
-      year              = year,
-      state_name        = state,
-      statisticcat_desc = "PROGRESS",
-      unit_desc         = "PCT",
-      agg_level_desc    = "STATE"
-    )),
-    error = function(e) return(NULL)
-  )
-  if (is.null(data) || nrow(data) == 0) return(NULL)
-  
-  unique(data$short_desc)
+  tools::toTitleCase(tolower(desc))
 }
 
-# ====================================================================
-# Planting Progress Data (2020–2025)
-# ====================================================================
-soy_history <- read.csv("soybean_progress_fixed.csv", stringsAsFactors = FALSE) %>%
+clean_value <- function(x) as.numeric(gsub(",", "", x))
+
+qs_common <- function(state = "VIRGINIA") {
+  list(
+    commodity_desc = "SOYBEANS",
+    state_name     = state,
+    agg_level_desc = "STATE",
+    source_desc    = "SURVEY"
+  )
+}
+
+# -------------------- Load historical CSVs ---------------------------
+# Actual progress (2020–2024)
+soy_progress <- read.csv("soybean_progress_fixed.csv", stringsAsFactors = FALSE) %>%
   mutate(
-    Year  = as.integer(Year),
+    Year  = as.character(Year),
     week  = as.Date(week),
     value = as.numeric(value)
   )
 
-# ---- Combined (CSV for 2020–2024, API for 2025) ----
+# 5-year averages (always from CSV)
+soy_avg <- read.csv("soybean_progress_avg.csv", stringsAsFactors = FALSE) %>%
+  mutate(
+    Year  = as.character(Year), 
+    week  = as.Date(week),
+    value = as.numeric(value)
+  )
+
+# Crop conditions (2020–2025)
+soy_conditions <- read.csv("soybean_conditions_fixed.csv", stringsAsFactors = FALSE) %>%
+  mutate(
+    Year  = as.character(Year),
+    week  = as.Date(week),
+    value = as.numeric(value)
+  )
+
+# ---------------- Planting Progress (Actual) ---------------------
 get_soy_progress_data <- function(year, category, state = "VIRGINIA") {
-  tryCatch({
-    if (year %in% 2020:2024) {
-      soy_history %>%
-        filter(Year == year, CategoryRaw == trimws(category))
-    } else if (year == 2025) {
-      nassqs(list(
-        commodity_desc    = "SOYBEANS",
-        year              = 2025,
-        state_name        = state,
-        statisticcat_desc = "PROGRESS",
-        short_desc        = paste("SOYBEANS - PROGRESS, MEASURED IN", category),
-        agg_level_desc    = "STATE"
+  if (year %in% 2020:2024) {
+    soy_progress %>%
+      filter(Year == as.character(year), CategoryRaw == category) %>%
+      mutate(Type = "Actual")
+    
+  } else if (year == 2025) {
+    tryCatch({
+      rnassqs::nassqs(c(
+        list(
+          commodity_desc    = "SOYBEANS",
+          state_name        = state,
+          agg_level_desc    = "STATE",
+          source_desc       = "SURVEY",
+          year              = year,
+          statisticcat_desc = "PROGRESS",
+          unit_desc         = "PCT",
+          short_desc        = paste("SOYBEANS - PROGRESS, MEASURED IN", category)
+        )
       )) %>%
-        mutate(
-          week     = as.Date(week_ending, tryFormats = c("%m/%d/%Y", "%Y-%m-%d")),
-          value    = as.numeric(Value),
-          Category = clean_title(category),
-          Year     = 2025
+        filter(grepl("^[0-9,]+$", Value)) %>%
+        transmute(
+          week        = as.Date(week_ending),
+          value       = clean_value(Value),
+          Type        = "Actual",
+          Year        = as.character(year),
+          CategoryRaw = category
         ) %>%
         filter(!is.na(week))
-    } else {
-      NULL
-    }
-  }, error = function(e) NULL)
+    }, error = function(e) NULL)
+    
+  } else {
+    NULL
+  }
 }
 
-# ---- 5-Year Average from CSV ----
+# ---------------- Planting Progress (5-Year Avg) ---------------------
 get_soy_avg_data <- function(year, category) {
-  tryCatch({
-    years <- (year - 5):(year - 1)
-    data <- soy_history %>%
-      filter(Year %in% years, CategoryRaw == trimws(category))
-    
-    if (nrow(data) == 0) return(NULL)
-    
-    data %>%
-      group_by(week) %>%
-      summarise(value = mean(value, na.rm = TRUE), .groups = "drop") %>%
-      mutate(Type = "5-Year Avg")
-  }, error = function(e) NULL)
+  soy_avg %>%
+    filter(CategoryRaw == category) %>%
+    mutate(
+      # shift the week date into the requested year
+      week = as.Date(paste0(year, format(week, "-%m-%d"))),
+      Year = as.character(year),
+      Type = "5-Year Avg"
+    )
+}
+
+# ---------------------- Crop Conditions ------------------------------
+get_soybean_conditions <- function(year) {
+  df <- soy_conditions %>%
+    filter(Year == as.character(year))
+  
+  if (nrow(df) == 0) return(NULL)
+  
+  levels5 <- c("VERY POOR", "POOR", "FAIR", "GOOD", "EXCELLENT")
+  
+  df <- df %>%
+    group_by(week, condition) %>%
+    summarise(value = sum(value), .groups = "drop") %>%
+    tidyr::complete(week, condition = levels5, fill = list(value = 0)) %>%
+    mutate(condition = factor(condition, levels = levels5),
+           Year = as.character(year))
+  
+  df
 }

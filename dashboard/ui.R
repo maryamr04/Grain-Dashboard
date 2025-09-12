@@ -4,6 +4,8 @@
 library(shiny)
 library(plotly)
 library(shinycssloaders)
+library(tidyr)
+
 
 years <- 2020:2025
 categories <- c("PCT PLANTED", "PCT EMERGED", "PCT BLOOMING",
@@ -70,19 +72,18 @@ ui <- fluidPage(
         border: none !important;
         padding: 10px;
       }
-      
-      /* Make tab titles white */
-.nav-tabs > li > a {
-  color: #FDFBF7 !important;
-  font-weight: bold;
-  font-family: 'Times New Roman', serif;
-}
-.nav-tabs > li.active > a {
-  color: #FDFBF7 !important;
-  background-color: #4B2E2B !important;
-  border: 1px solid #3E2C23 !important;
-}
 
+      /* Make tab titles white */
+      .nav-tabs > li > a {
+        color: #FDFBF7 !important;
+        font-weight: bold;
+        font-family: 'Times New Roman', serif;
+      }
+      .nav-tabs > li.active > a {
+        color: #FDFBF7 !important;
+        background-color: #4B2E2B !important;
+        border: 1px solid #3E2C23 !important;
+      }
 
       /* ---- Sidebar List Items ---- */
       .nav-pills > li {
@@ -97,7 +98,6 @@ ui <- fluidPage(
       h1("🌱 Soybean Interactive Dashboard"),
       h4("A tool brought to you by the Virginia Tech Kohl Centre")
   ),
-  
   
   # ====================================================================
   #  Sidebar Navigation
@@ -114,7 +114,7 @@ ui <- fluidPage(
     
     # ---- Planting Progress Tab ----
     tabPanel("Planting Progress",
-             h3(" Planting Progress"),
+             h3("🌱 Planting Progress"),
              
              # About this Data Info Box
              div(style = "
@@ -133,7 +133,6 @@ ui <- fluidPage(
              ),
        
        # Yearly Tabs (2020–2025)
-       # Year Tabs (2020–2025)
        do.call(tabsetPanel, c(
          id = "year_tabs",
          lapply(years, function(yr) {
@@ -154,8 +153,42 @@ ui <- fluidPage(
          })
        ))
     ),
+    
+    # ---- rop Conditions Tab ----
+    tabPanel("Crop Conditions",
+             h3("🌾 Soybean Crop Conditions"),
+             div(style = "
+         background-color:#4B2E2B;
+         color:#FDFBF7;
+         font-family:'Times New Roman', serif;
+         padding:15px;
+         border-radius:8px;
+         margin-bottom:20px;
+         box-shadow:0 3px 8px rgba(0,0,0,0.2);
+       ",
+       h4("About this Data"),
+       p("Soybean crop conditions (2020–2025) are pulled directly from the USDA NASS API. 
+          Categories include Very Poor, Poor, Fair, Good, and Excellent. 
+          Percentages represent the share of soybean acres in each condition.")
+             ),
+       
+       # Year Tabs (2020–2025)
+       do.call(tabsetPanel, c(
+         id = "condition_year_tabs",
+         lapply(years, function(yr) {
+           tabPanel(
+             title = paste(yr),
+             withSpinner(
+               plotlyOutput(paste0("soy_conditions_", yr), height = "400px"),
+               type = 4, color = "#FDFBF7", size = 0.7
+             ),
+             br()
+           )
+         })
+       ))
+    ),
+    
     # ---- Placeholder Tabs ----
-    tabPanel("Crop Conditions", h3("🌾 Crop Conditions (Placeholder)")),
     tabPanel("Yield Trends",    h3("📈 Yield Trends (Placeholder)")),
     tabPanel("Remote Sensing",  h3("🛰️ Remote Sensing (Placeholder)")),
     tabPanel("About",           h3("ℹ️ About (Placeholder)"))
