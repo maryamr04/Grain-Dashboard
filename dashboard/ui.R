@@ -6,8 +6,7 @@ library(plotly)
 library(shinycssloaders)
 library(tidyr)
 
-
-years <- 2020:2025
+years <- 2014:2025
 categories <- c("PCT PLANTED", "PCT EMERGED", "PCT BLOOMING",
                 "PCT SETTING PODS", "PCT DROPPING LEAVES", "PCT HARVESTED")
 
@@ -50,7 +49,7 @@ ui <- fluidPage(
       .nav-pills > li > a:hover {
         background-color:#6B4226; color:white;
       }
-
+      
       /* ---- Tab Content Panels ---- */
       .tab-content > .tab-pane {
         background-color:#4B2E2B; color:#FDFBF7;
@@ -65,30 +64,7 @@ ui <- fluidPage(
         font-family:'Times New Roman', serif;
         font-size:16px; color:#FDFBF7;
       }
-
-      /* ---- Sidebar Container ---- */
-      .nav-pills {
-        background-color: transparent !important;
-        border: none !important;
-        padding: 10px;
-      }
-
-      /* Make tab titles white */
-      .nav-tabs > li > a {
-        color: #FDFBF7 !important;
-        font-weight: bold;
-        font-family: 'Times New Roman', serif;
-      }
-      .nav-tabs > li.active > a {
-        color: #FDFBF7 !important;
-        background-color: #4B2E2B !important;
-        border: 1px solid #3E2C23 !important;
-      }
-
-      /* ---- Sidebar List Items ---- */
-      .nav-pills > li {
-        margin-bottom: 8px;
-      }
+      
   "))),
   
   # ====================================================================
@@ -108,53 +84,49 @@ ui <- fluidPage(
     # ---- Objective Tab ----
     tabPanel("Objective",
              h2("🌱 Welcome"),
-             p("Explore soybean planting progress (2020–2025) across stages, 
-         compared to 5-year averages. Data is from the USDA NASS API.")
+             p("Explore soybean planting progress (2013–2025) across stages, 
+                compared to 5-year averages. Data is from the USDA NASS API.")
     ),
     
     # ---- Planting Progress Tab ----
     tabPanel("Planting Progress",
              h3("🌱 Planting Progress"),
              
-             # About this Data Info Box
              div(style = "
-         background-color:#4B2E2B;
-         color:#FDFBF7;
-         font-family:'Times New Roman', serif;
-         padding:15px;
-         border-radius:8px;
-         margin-bottom:20px;
-         box-shadow:0 3px 8px rgba(0,0,0,0.2);
-       ",
-       h4("About this Data"),
-       p("This dashboard uses soybean planting progress and crop development data 
-          from the USDA NASS API. All percentages represent the share of soybean acres 
-          at each growth stage in Virginia.")
+        background-color:#4B2E2B;
+        color:#FDFBF7;
+        font-family:'Times New Roman', serif;
+        padding:15px;
+        border-radius:8px;
+        margin-bottom:20px;
+        box-shadow:0 3px 8px rgba(0,0,0,0.2);
+      ",
+      h4("About this Data"),
+      p("This dashboard uses soybean planting progress and crop development data 
+         from USDA NASS. Percentages represent the share of soybean acres at each growth stage in Virginia.")
              ),
-       
-       # Yearly Tabs (2020–2025)
-       do.call(tabsetPanel, c(
-         id = "year_tabs",
-         lapply(years, function(yr) {
-           tabPanel(
-             title = paste(yr),
-             lapply(categories, function(cat) {
-               safe_id <- paste0("soy_progress_", yr, "_", gsub("[^A-Za-z]", "_", cat))
-               tagList(
-                 h4(paste(clean_title(cat), "—", yr)),
-                 withSpinner(
-                   plotlyOutput(safe_id, height = "300px"),
-                   type = 4, color = "#FDFBF7", size = 0.7
-                 ),
-                 br()
-               )
-             })
-           )
-         })
-       ))
+      
+      # Year selector
+      selectInput("year_sel", "Select Year:",
+                  choices = 2014:2025, selected = 2025),
+      
+      # All category plots stacked vertically
+      # All category plots stacked vertically
+      lapply(progress_categories, function(cat) {
+        safe_id <- paste0("soy_progress_", gsub("[^A-Za-z]", "_", cat))
+        tagList(
+          h4(cat),   # <-- FIXED: use raw category name here
+          withSpinner(
+            plotlyOutput(safe_id, height = "300px"),
+            type = 4, color = "#FDFBF7", size = 0.7
+          ),
+          br()
+        )
+      })
     ),
     
-    # ---- rop Conditions Tab ----
+    
+    # ---- Crop Conditions Tab ----
     tabPanel("Crop Conditions",
              h3("🌾 Soybean Crop Conditions"),
              div(style = "
@@ -167,26 +139,67 @@ ui <- fluidPage(
          box-shadow:0 3px 8px rgba(0,0,0,0.2);
        ",
        h4("About this Data"),
-       p("Soybean crop conditions (2020–2025) are pulled directly from the USDA NASS API. 
+       p("Soybean crop conditions (2013–2025) are pulled from the USDA NASS API. 
           Categories include Very Poor, Poor, Fair, Good, and Excellent. 
           Percentages represent the share of soybean acres in each condition.")
              ),
        
-       # Year Tabs (2020–2025)
-       do.call(tabsetPanel, c(
-         id = "condition_year_tabs",
-         lapply(years, function(yr) {
-           tabPanel(
-             title = paste(yr),
-             withSpinner(
-               plotlyOutput(paste0("soy_conditions_", yr), height = "400px"),
-               type = 4, color = "#FDFBF7", size = 0.7
-             ),
-             br()
-           )
-         })
-       ))
+       # User Control
+       selectInput("year_sel_conditions", "Select Year:", choices = years, selected = 2025),
+       
+       # Conditions Plot
+       withSpinner(
+         plotlyOutput("plot_conditions", height = "400px"),
+         type = 4, color = "#FDFBF7", size = 0.7
+       )
     ),
+    
+    # ---- County Analysis Tab ----
+    tabPanel("County Analysis",
+             h3("🏞️ County-Level Soybean Analysis"),
+             div(style = "
+           background-color:#4B2E2B;
+           color:#FDFBF7;
+           font-family:'Times New Roman', serif;
+           padding:15px;
+           border-radius:8px;
+           margin-bottom:20px;
+           box-shadow:0 3px 8px rgba(0,0,0,0.2);
+         ",
+         h4("About this Data"),
+         p("This section compares soybean acres planted, harvested, 
+            and harvest success rates (2014–2024 CSV, 2025 API in future). 
+            Select a state and one or more counties to visualize trends over time.")
+             ),
+         
+         # State + County selectors
+         selectInput("state_sel", "Select State:", choices = unique(soy_county$State)),
+         selectInput("county_sel", "Select County:", 
+                     choices = unique(soy_county$County),
+                     multiple = TRUE, 
+                     selected = unique(soy_county$County)[1]),
+         
+         # Plots
+         withSpinner(plotlyOutput("county_planted_plot", height = "300px"),
+                     type = 4, color = "#FDFBF7", size = 0.7),
+         br(),
+         withSpinner(plotlyOutput("county_harvested_plot", height = "300px"),
+                     type = 4, color = "#FDFBF7", size = 0.7),
+         br(),
+         withSpinner(plotlyOutput("county_success_plot", height = "300px"),
+                     type = 4, color = "#FDFBF7", size = 0.7),
+         br(),
+         
+         # Map year dropdown
+         selectInput("map_year_sel", "Select Year (Map):",
+                     choices = 2013:2024,
+                     selected = 2024),
+         
+         # Map
+         withSpinner(plotlyOutput("county_map", height = "500px"),
+                     type = 4, color = "#FDFBF7", size = 0.7)
+    ),
+    
     
     # ---- Placeholder Tabs ----
     tabPanel("Yield Trends",    h3("📈 Yield Trends (Placeholder)")),

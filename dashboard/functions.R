@@ -1,20 +1,24 @@
 # ====================================================================
 # functions.R
 # ====================================================================
+
 library(rnassqs)
 library(dplyr)
 library(lubridate)
-library(tidyr)
 
 # ------------------------- Helpers -----------------------------------
+
+# Clean titles (remove long USDA prefixes, fix casing)
 clean_title <- function(desc) {
   desc <- gsub("SOYBEANS - PROGRESS, MEASURED IN ", "", desc)
   desc <- gsub("PCT ", "", desc)
   tools::toTitleCase(tolower(desc))
 }
 
+# Convert USDA "1,234" style numbers into numeric
 clean_value <- function(x) as.numeric(gsub(",", "", x))
 
+# Shared query template (for API pulls)
 qs_common <- function(state = "VIRGINIA") {
   list(
     commodity_desc = "SOYBEANS",
@@ -24,8 +28,11 @@ qs_common <- function(state = "VIRGINIA") {
   )
 }
 
-# -------------------- Load historical CSVs ---------------------------
-# Actual progress (2020–2024)
+# ====================================================================
+#  Planting Progress Module (CSV 2014–2024, API 2025)
+# ====================================================================
+
+# Load cleaned CSV (2014–2024, contains Actual + 5-Year Avg)
 soy_progress <- read.csv("soybean_progress_fixed.csv", stringsAsFactors = FALSE) %>%
   mutate(
     Year  = as.character(Year),
@@ -33,44 +40,39 @@ soy_progress <- read.csv("soybean_progress_fixed.csv", stringsAsFactors = FALSE)
     value = as.numeric(value)
   )
 
-# 5-year averages (always from CSV)
-soy_avg <- read.csv("soybean_progress_avg.csv", stringsAsFactors = FALSE) %>%
-  mutate(
-    Year  = as.character(Year), 
-    week  = as.Date(week),
-    value = as.numeric(value)
-  )
+# All planting progress categories tracked by USDA
+progress_categories <- c(
+  "PCT PLANTED",
+  "PCT EMERGED",
+  "PCT BLOOMING",
+  "PCT SETTING PODS",
+  "PCT DROPPING LEAVES",
+  "PCT HARVESTED"
+)
 
-# Crop conditions (2020–2025)
-soy_conditions <- read.csv("soybean_conditions_fixed.csv", stringsAsFactors = FALSE) %>%
-  mutate(
-    Year  = as.character(Year),
-    week  = as.Date(week),
-    value = as.numeric(value)
-  )
+# ---------------------- Planting Progress ----------------------------
 
-# ---------------- Planting Progress (Actual) ---------------------
+# Get Actual progress data (CSV for 2014–2024, API for 2025)
 get_soy_progress_data <- function(year, category, state = "VIRGINIA") {
-  if (year %in% 2020:2024) {
+  if (year %in% 2014:2024) {
     soy_progress %>%
-      filter(Year == as.character(year), CategoryRaw == category) %>%
-      mutate(Type = "Actual")
-    
+      filter(Year == as.character(year),
+             CategoryRaw == category,
+             Type == "Actual")
   } else if (year == 2025) {
     tryCatch({
-      rnassqs::nassqs(c(
-        list(
-          commodity_desc    = "SOYBEANS",
-          state_name        = state,
-          agg_level_desc    = "STATE",
-          source_desc       = "SURVEY",
-          year              = year,
-          statisticcat_desc = "PROGRESS",
-          unit_desc         = "PCT",
-          short_desc        = paste("SOYBEANS - PROGRESS, MEASURED IN", category)
-        )
-      )) %>%
-        filter(grepl("^[0-9,]+$", Value)) %>%
+      df <- rnassqs::nassqs(list(
+        commodity_desc = "SOYBEANS",
+        state_name     = state,
+        agg_level_desc = "STATE",
+        source_desc    = "SURVEY",
+        year           = year,
+        unit_desc      = "PCT"
+      ))
+      
+      df %>%
+        filter(grepl("SOYBEANS - PROGRESS", short_desc),
+               grepl(category, short_desc, ignore.case = TRUE)) %>%
         transmute(
           week        = as.Date(week_ending),
           value       = clean_value(Value),
@@ -79,40 +81,118 @@ get_soy_progress_data <- function(year, category, state = "VIRGINIA") {
           CategoryRaw = category
         ) %>%
         filter(!is.na(week))
-    }, error = function(e) NULL)
-    
-  } else {
-    NULL
+    }, error = function(e) {
+      message("Error fetching 2025 planting progress: ", e$message)
+      NULL
+    })
   }
 }
 
-# ---------------- Planting Progress (5-Year Avg) ---------------------
+# Get 5-Year Average (from CSV only)
 get_soy_avg_data <- function(year, category) {
-  soy_avg %>%
-    filter(CategoryRaw == category) %>%
-    mutate(
-      # shift the week date into the requested year
-      week = as.Date(paste0(year, format(week, "-%m-%d"))),
-      Year = as.character(year),
-      Type = "5-Year Avg"
-    )
+  soy_progress %>%
+    filter(CategoryRaw == category,
+           Type == "5-Year Avg") %>%
+    mutate(Year = as.character(year))
 }
 
-# ---------------------- Crop Conditions ------------------------------
-get_soybean_conditions <- function(year) {
-  df <- soy_conditions %>%
-    filter(Year == as.character(year))
-  
-  if (nrow(df) == 0) return(NULL)
-  
-  levels5 <- c("VERY POOR", "POOR", "FAIR", "GOOD", "EXCELLENT")
-  
-  df <- df %>%
-    group_by(week, condition) %>%
-    summarise(value = sum(value), .groups = "drop") %>%
-    tidyr::complete(week, condition = levels5, fill = list(value = 0)) %>%
-    mutate(condition = factor(condition, levels = levels5),
-           Year = as.character(year))
-  
-  df
+
+# ====================================================================
+# Soybean Conditions Module (CSV 2013–2024, API 2025)
+# ====================================================================
+
+# Load cleaned CSV
+soy_conditions <- read.csv("soybean_conditions_fixed.csv", stringsAsFactors = FALSE) %>%
+  mutate(
+    Year  = as.character(Year),
+    week  = as.Date(week),
+    value = as.numeric(value),
+    condition = toupper(condition)
+  )
+
+# Standardize levels
+condition_levels <- c("VERY POOR", "POOR", "FAIR", "GOOD", "EXCELLENT")
+
+# Function: returns conditions for a given year
+get_soybean_conditions <- function(year, state = "VIRGINIA") {
+  if (year %in% 2013:2024) {
+    # From CSV
+    df <- soy_conditions %>%
+      filter(Year == as.character(year)) %>%
+      group_by(week, condition) %>%
+      summarise(value = sum(value), .groups = "drop") %>%
+      tidyr::complete(week, condition = condition_levels, fill = list(value = 0)) %>%
+      mutate(condition = factor(condition, levels = condition_levels),
+             Year = as.character(year))
+    return(df)
+    
+  } else if (year == 2025) {
+    # From API
+    df <- tryCatch({
+      rnassqs::nassqs(list(
+        commodity_desc    = "SOYBEANS",
+        state_name        = state,
+        agg_level_desc    = "STATE",
+        source_desc       = "SURVEY",
+        year              = year,
+        statisticcat_desc = "CONDITION",
+        unit_desc         = "PCT"
+      ))
+    }, error = function(e) {
+      message("Error fetching 2025 conditions: ", e$message)
+      return(NULL)
+    })
+    
+    if (!is.null(df) && nrow(df) > 0) {
+      df <- df %>%
+        transmute(
+          week      = as.Date(week_ending),
+          value     = as.numeric(gsub(",", "", Value)),
+          condition = toupper(condition),
+          Year      = as.character(year)
+        ) %>%
+        filter(!is.na(week)) %>%
+        group_by(week, condition) %>%
+        summarise(value = sum(value), .groups = "drop") %>%
+        tidyr::complete(week, condition = condition_levels, fill = list(value = 0)) %>%
+        mutate(condition = factor(condition, levels = condition_levels),
+               Year = as.character(year))
+      return(df)
+    } else {
+      return(NULL)
+    }
+  } else {
+    return(NULL)
+  }
+}
+
+# ====================================================================
+#  County Analysis Module (2014–2024 CSV, 2025 API later)
+# ====================================================================
+
+soy_county <- read.csv("soybean_county_fixed.csv", stringsAsFactors = FALSE) %>%
+  mutate(
+    Year        = as.character(Year),
+    Planted     = as.numeric(Planted),
+    Harvested   = as.numeric(Harvested),
+    SuccessRate = as.numeric(SuccessRate),
+    GEOID       = stringr::str_pad(GEOID, 5, pad = "0") # ensure 5 digits
+  )
+
+get_county_planted <- function(year) {
+  soy_county %>%
+    filter(Year == as.character(year)) %>%
+    select(State, County, GEOID, Year, Planted)
+}
+
+get_county_harvested <- function(year) {
+  soy_county %>%
+    filter(Year == as.character(year)) %>%
+    select(State, County, GEOID, Year, Harvested)
+}
+
+get_county_success <- function(year) {
+  soy_county %>%
+    filter(Year == as.character(year)) %>%
+    select(State, County, GEOID, Year, SuccessRate)
 }
