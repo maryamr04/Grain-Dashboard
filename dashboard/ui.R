@@ -190,14 +190,15 @@ ui <- fluidPage(
                      type = 4, color = "#FDFBF7", size = 0.7),
          br(),
          
-         # Map year dropdown
+         # Map
          selectInput("map_year_sel", "Select Year (Map):",
                      choices = 2013:2024,
                      selected = 2024),
          
-         # Map
-         withSpinner(plotlyOutput("county_map", height = "500px"),
-                     type = 4, color = "#FDFBF7", size = 0.7)
+         withSpinner(
+           leafletOutput("county_map", height = "500px"),   # <-- FIXED
+           type = 4, color = "#FDFBF7", size = 0.7 )
+         
     ),
     
     

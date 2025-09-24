@@ -5,6 +5,7 @@
 library(rnassqs)
 library(dplyr)
 library(lubridate)
+options(tigris_use_cache = TRUE)
 
 # ------------------------- Helpers -----------------------------------
 
@@ -61,18 +62,15 @@ get_soy_progress_data <- function(year, category, state = "VIRGINIA") {
              Type == "Actual")
   } else if (year == 2025) {
     tryCatch({
-      df <- rnassqs::nassqs(list(
-        commodity_desc = "SOYBEANS",
-        state_name     = state,
-        agg_level_desc = "STATE",
-        source_desc    = "SURVEY",
-        year           = year,
-        unit_desc      = "PCT"
-      ))
-      
-      df %>%
-        filter(grepl("SOYBEANS - PROGRESS", short_desc),
-               grepl(category, short_desc, ignore.case = TRUE)) %>%
+      rnassqs::nassqs(list(
+        commodity_desc    = "SOYBEANS",
+        state_name        = state,
+        agg_level_desc    = "STATE",
+        source_desc       = "SURVEY",
+        year              = year,
+        statisticcat_desc = "PROGRESS",
+        unit_desc         = category   # <-- THIS matches "PCT PLANTED", "PCT EMERGED", etc.
+      )) %>%
         transmute(
           week        = as.Date(week_ending),
           value       = clean_value(Value),
@@ -87,6 +85,7 @@ get_soy_progress_data <- function(year, category, state = "VIRGINIA") {
     })
   }
 }
+
 
 # Get 5-Year Average (from CSV only)
 get_soy_avg_data <- function(year, category) {
@@ -135,8 +134,8 @@ get_soybean_conditions <- function(year, state = "VIRGINIA") {
         agg_level_desc    = "STATE",
         source_desc       = "SURVEY",
         year              = year,
-        statisticcat_desc = "CONDITION",
-        unit_desc         = "PCT"
+        statisticcat_desc = "CONDITION"   # ✅ condition filter
+        # no need for unit_desc = "PCT"
       ))
     }, error = function(e) {
       message("Error fetching 2025 conditions: ", e$message)
@@ -145,10 +144,11 @@ get_soybean_conditions <- function(year, state = "VIRGINIA") {
     
     if (!is.null(df) && nrow(df) > 0) {
       df <- df %>%
+        filter(grepl("^PCT ", unit_desc)) %>%   # ✅ only keep % condition rows
         transmute(
           week      = as.Date(week_ending),
           value     = as.numeric(gsub(",", "", Value)),
-          condition = toupper(condition),
+          condition = gsub("PCT ", "", toupper(unit_desc)),  # ✅ parse from unit_desc
           Year      = as.character(year)
         ) %>%
         filter(!is.na(week)) %>%
@@ -161,10 +161,12 @@ get_soybean_conditions <- function(year, state = "VIRGINIA") {
     } else {
       return(NULL)
     }
+    
   } else {
     return(NULL)
   }
 }
+
 
 # ====================================================================
 #  County Analysis Module (2014–2024 CSV, 2025 API later)
@@ -176,8 +178,23 @@ soy_county <- read.csv("soybean_county_fixed.csv", stringsAsFactors = FALSE) %>%
     Planted     = as.numeric(Planted),
     Harvested   = as.numeric(Harvested),
     SuccessRate = as.numeric(SuccessRate),
-    GEOID       = stringr::str_pad(GEOID, 5, pad = "0") # ensure 5 digits
+    GEOID       = stringr::str_pad(GEOID, 5, pad = "0"),
+    County      = tolower(trimws(County)),
+    State       = case_when(
+      State == "VIRGINIA" ~ "VA",
+      State == "NORTH CAROLINA" ~ "NC",
+      State == "MARYLAND" ~ "MD",
+      TRUE ~ State
+    )
+  ) %>%
+  group_by(State, County, Year) %>%
+  summarise(
+    Planted     = sum(Planted, na.rm = TRUE),
+    Harvested   = sum(Harvested, na.rm = TRUE),
+    SuccessRate = mean(SuccessRate, na.rm = TRUE),
+    .groups = "drop"
   )
+
 
 get_county_planted <- function(year) {
   soy_county %>%
@@ -196,3 +213,8 @@ get_county_success <- function(year) {
     filter(Year == as.character(year)) %>%
     select(State, County, GEOID, Year, SuccessRate)
 }
+all_counties <- readRDS("all_counties.rds")
+
+
+
+

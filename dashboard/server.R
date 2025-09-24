@@ -6,6 +6,10 @@ library(shiny)
 library(plotly)
 library(dplyr)
 library(ggplot2)
+library(leaflet)
+library(sf)      
+library(tigris)  
+options(tigris_use_cache = TRUE)
 
 server <- function(input, output, session) {
   
@@ -222,66 +226,73 @@ server <- function(input, output, session) {
   })
   
   # ---------------- County Choropleth ----------------
-output$county_map <- renderPlotly({
-  req(input$map_year_sel)
-  
-  df <- soy_county %>%
-    filter(Year == as.character(input$map_year_sel))   
-  
-  if (nrow(df) == 0) {
-    return(plotly_empty(type = "choropleth") %>%
-             layout(title = list(text = paste("No data for", input$map_year_sel))))
-  }
-  
-  plot_ly(
-    data = df,
-    type = "choropleth",
-    locations = ~GEOID,               
-    geojson = "https://raw.githubusercontent.com/plotly/datasets/master/geojson-counties-fips.json",
-    z = ~SuccessRate,
-    colorscale = list(
-      c(0, "rgb(139, 69, 19)"),       
-      c(0.5, "rgb(222, 184, 135)"),  
-      c(1, "rgb(34, 139, 34)")        
-    ),
-    marker = list(line = list(width = 0.3, color = "gray")),
-    hoverinfo = "text",
-    text = ~paste0(
-      County, ", ", State, "<br>",
-      "Harvest Success Rate: ", round(SuccessRate, 1), "%<br>",
-      "Planted: ", Planted, "<br>",
-      "Harvested: ", Harvested
-    ),
-    colorbar = list(
-      title = list(text = "🌾 Success Rate (%)"),
-      titleside = "top",
-      tickformat = ".0f",
-      len = 0.6,
-      yanchor = "middle",
-      thickness = 15
+  output$county_map <- renderLeaflet({
+    req(input$map_year_sel)
+    
+    # Filter soybean data for selected year
+    df <- soy_county %>%
+      filter(Year == as.character(input$map_year_sel)) %>%
+      mutate(
+        County = tolower(County),
+        County = gsub(" county", "", County),
+        County = trimws(County)
+      )
+    
+    if (nrow(df) == 0) {
+      return(
+        leaflet() %>%
+          addProviderTiles("CartoDB.Positron") %>%
+          addLabelOnlyMarkers(
+            lng = -78.6569, lat = 37.5,
+            label = paste("No soybean data for", input$map_year_sel),
+            labelOptions = labelOptions(noHide = TRUE, textOnly = TRUE)
+          ) %>%
+          setView(lng = -78.6569, lat = 37.5, zoom = 6)
+      )
+    }
+
+    map_data <- left_join(
+      all_counties,
+      df,  
+      by = c("County", "State")
+    ) %>% st_as_sf()
+    
+    
+    
+    
+    
+    pal <- colorBin(
+      palette = c("#8B4513", "#DEB887", "#228B22"),  # earthy: brown → tan → green
+      domain = map_data$SuccessRate,
+      bins = 5,
+      na.color = "#f0f0f0"
     )
     
-  ) %>%
-    layout(
-      geo = list(
-        scope = "usa",
-        projection = list(type = "albers usa"),
-        fitbounds = "locations",
-        bgcolor = "#F3E5D0"   # earthy tan background
-      ),
-      title = list(
-        text = paste("Soybean Harvest Success Rate —", input$map_year_sel),
-        font = list(family = "Times New Roman", size = 18, color = "#2E7D32")
-      ),
-      paper_bgcolor = "#F3E5D0"
-    )
-  
-})
-
-  
-  
+    leaflet(map_data) %>%
+      addProviderTiles("CartoDB.Positron") %>%
+      addPolygons(
+        fillColor = ~pal(SuccessRate),
+        color = "white",
+        weight = 0.6,
+        fillOpacity = 0.8,
+        label = ~paste0(
+          "<strong>", tools::toTitleCase(County), ", ", State, "</strong><br>",
+          "🌱 Success Rate: ", ifelse(is.na(SuccessRate), "N/A", paste0(SuccessRate, "%")), "<br>",
+          "🌾 Planted: ", ifelse(is.na(Planted), "N/A", formatC(Planted, big.mark=",")), "<br>",
+          "🌾 Harvested: ", ifelse(is.na(Harvested), "N/A", formatC(Harvested, big.mark=","))
+        ) %>% lapply(htmltools::HTML),
+        highlightOptions = highlightOptions(
+          weight = 2,
+          color = "#666",
+          fillOpacity = 0.9,
+          bringToFront = TRUE
+        )
+      ) %>%
+      addLegend(
+        "bottomright", pal = pal, values = ~SuccessRate,
+        title = "🌾 Success Rate (%)",
+        opacity = 1
+      ) %>%
+      setView(lng = -78.6569, lat = 37.5, zoom = 6)
+  })
 }
-
-
-
-
