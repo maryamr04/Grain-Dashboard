@@ -33,12 +33,13 @@ qs_common <- function(state = "VIRGINIA") {
 #  Planting Progress Module (CSV 2014–2024, API 2025)
 # ====================================================================
 
-# Load cleaned CSV (2014–2024, contains Actual + 5-Year Avg)
-soy_progress <- read.csv("soybean_progress_fixed.csv", stringsAsFactors = FALSE) %>%
+# Load cleaned + combined CSV (2014–2024 Actual + 5-Year Avg)
+soy_progress <- read.csv("soybeans_progress_with_5yravg_final.csv", stringsAsFactors = FALSE) %>%
   mutate(
     Year  = as.character(Year),
     week  = as.Date(week),
-    value = as.numeric(value)
+    value = as.numeric(value),
+    five_year_avg_value = as.numeric(five_year_avg_value)
   )
 
 # All planting progress categories tracked by USDA
@@ -53,23 +54,23 @@ progress_categories <- c(
 
 # ---------------------- Planting Progress ----------------------------
 
-# Get Actual progress data (CSV for 2014–2024, API for 2025)
-get_soy_progress_data <- function(year, category, state = "VIRGINIA") {
+# Get Actual + 5-Year Avg from CSV (2014–2024)
+get_soy_progress_data <- function(year, category) {
   if (year %in% 2014:2024) {
     soy_progress %>%
-      filter(Year == as.character(year),
-             CategoryRaw == category,
-             Type == "Actual")
+      filter(Year == as.character(year), CategoryRaw == category, Type == "Actual") %>%
+      mutate(Type = "Actual")
   } else if (year == 2025) {
+    # API pull for 2025
     tryCatch({
       rnassqs::nassqs(list(
         commodity_desc    = "SOYBEANS",
-        state_name        = state,
+        state_name        = "VIRGINIA",
         agg_level_desc    = "STATE",
         source_desc       = "SURVEY",
         year              = year,
         statisticcat_desc = "PROGRESS",
-        unit_desc         = category   # <-- THIS matches "PCT PLANTED", "PCT EMERGED", etc.
+        unit_desc         = category
       )) %>%
         transmute(
           week        = as.Date(week_ending),
@@ -86,12 +87,10 @@ get_soy_progress_data <- function(year, category, state = "VIRGINIA") {
   }
 }
 
-
-# Get 5-Year Average (from CSV only)
+# Get 5-Year Average (from combined CSV only)
 get_soy_avg_data <- function(year, category) {
   soy_progress %>%
-    filter(CategoryRaw == category,
-           Type == "5-Year Avg") %>%
+    filter(CategoryRaw == category, Type == "5-Year Avg") %>%
     mutate(Year = as.character(year))
 }
 
@@ -216,5 +215,36 @@ get_county_success <- function(year) {
 all_counties <- readRDS("all_counties.rds")
 
 
+# ====================================================================
+#  Remote Sensing Module (EDVI + NDVI 2013–2025 CSV)
+# ====================================================================
 
+# Load cleaned EDVI/NDVI dataset
+soy_edvi <- read.csv("Soybeans_WeeklyBands_2013_2025_clean_EDVI.csv",
+                     stringsAsFactors = FALSE) %>%
+  mutate(
+    date        = as.Date(date),
+    week        = as.integer(week),
+    year        = as.integer(year),
+    mean_EDVI   = as.numeric(mean_EDVI),
+    mean_NDVI   = as.numeric(NDVI),  # <-- NEW COLUMN
+    county_name = as.character(county_name)
+  )
 
+# Function to filter EDVI data for given year & counties
+get_soy_edvi <- function(year, counties = NULL) {
+  df <- soy_edvi %>% filter(year == !!year)
+  if (!is.null(counties)) {
+    df <- df %>% filter(county_name %in% counties)
+  }
+  return(df %>% select(year, week, county_name, mean_EDVI))
+}
+
+# Function to filter NDVI data for given year & counties
+get_soy_ndvi <- function(year, counties = NULL) {
+  df <- soy_edvi %>% filter(year == !!year)
+  if (!is.null(counties)) {
+    df <- df %>% filter(county_name %in% counties)
+  }
+  return(df %>% select(year, week, county_name, mean_NDVI))
+}

@@ -1,0 +1,13 @@
+Package: grain
+Type: Shiny
+Title: Grain Dashboard
+Version: 0.0.1
+Imports:
+    shiny,
+    leaflet,
+    plotly,
+    dplyr,
+    tidyr,
+    readr,
+    sf,
+    shinycssloaders

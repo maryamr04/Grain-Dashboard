@@ -33,6 +33,26 @@ ui <- fluidPage(
         font-family:'Times New Roman', serif; font-style:italic;
         color:#EADBC8; font-weight:400;
       }
+      
+/* Sidebar background */
+.nav-stacked {
+  background-color: #F3E5D0 !important;  /* beige like the body */
+  border: none !important;
+  box-shadow: none !important;
+}
+
+/* Remove white panel box around sidebar */
+.navlist-panel {
+  background-color: #F3E5D0 !important;
+  border: none !important;
+}
+
+/* Make sidebar background beige */
+.well {
+  background-color: #F3E5D0 !important; 
+  border: none !important;
+  box-shadow: none !important;
+}
 
       /* ---- Sidebar Navigation Buttons ---- */
       .nav-pills > li > a {
@@ -47,7 +67,7 @@ ui <- fluidPage(
         background-color:#3E2C23 !important; color:#FDFBF7 !important;
       }
       .nav-pills > li > a:hover {
-        background-color:#6B4226; color:white;
+        background-color:#6B4226; color:#3E2C23;
       }
       
       /* ---- Tab Content Panels ---- */
@@ -90,7 +110,7 @@ ui <- fluidPage(
     
     # ---- Planting Progress Tab ----
     tabPanel("Planting Progress",
-             h3("🌱 Planting Progress"),
+             h3("Soybean Planting Progress"),
              
              div(style = "
         background-color:#4B2E2B;
@@ -128,7 +148,7 @@ ui <- fluidPage(
     
     # ---- Crop Conditions Tab ----
     tabPanel("Crop Conditions",
-             h3("🌾 Soybean Crop Conditions"),
+             h3("Soybean Crop Conditions"),
              div(style = "
          background-color:#4B2E2B;
          color:#FDFBF7;
@@ -156,7 +176,7 @@ ui <- fluidPage(
     
     # ---- County Analysis Tab ----
     tabPanel("County Analysis",
-             h3("🏞️ County-Level Soybean Analysis"),
+             h3("County-Level Soybean Analysis"),
              div(style = "
            background-color:#4B2E2B;
            color:#FDFBF7;
@@ -201,10 +221,69 @@ ui <- fluidPage(
          
     ),
     
+    # ---- Remote Sensing Trends Tab ----
+    tabPanel("Remote Sensing Data",
+             h3("Soybean Enhanced Difference Vegetation Index (EDVI)"),
+             div(style = "
+        background-color:#4B2E2B;
+        color:#FDFBF7;
+        font-family:'Times New Roman', serif;
+        padding:15px;
+        border-radius:8px;
+        margin-bottom:20px;
+        box-shadow:0 3px 8px rgba(0,0,0,0.2);
+      ",
+      h4("About EDVI"),
+      p("EDVI (Enhanced Difference Vegetation Index) is similar to NDVI but 
+         uses the blue band to better correct for atmospheric and soil background 
+         effects. It is calculated as:"),
+      p("EDVI = (NIR - RED) / sqrt(NIR + RED)"),
+      p("Higher EDVI values indicate greener, healthier vegetation. 
+         This plot shows weekly county-level averages for Virginia soybeans (2013–2025).")
+             ),
+      
+      # EDVI controls + plot
+      selectInput("edvi_year", "Select Year:", 2013:2025, selected = 2025),
+      selectInput("edvi_county", "Select County:",
+                  choices = NULL, multiple = TRUE),
+      withSpinner(
+        plotlyOutput("edvi_plot", height = "500px"),
+        type = 4, color = "#FDFBF7", size = 0.7
+      ),
+      
+      br(), hr(), br(),  # <-- nice break between EDVI and NDVI
+      
+      h3("Soybean Normalized Difference Vegetation Index (NDVI)"),
+      div(style = "
+        background-color:#4B2E2B;
+        color:#FDFBF7;
+        font-family:'Times New Roman', serif;
+        padding:15px;
+        border-radius:8px;
+        margin-bottom:20px;
+        box-shadow:0 3px 8px rgba(0,0,0,0.2);
+      ",
+      h4("About NDVI"),
+      p("NDVI (Normalized Difference Vegetation Index) is one of the most 
+         widely used vegetation indices. It is calculated as:"),
+      p("NDVI = (NIR - RED) / (NIR + RED)"),
+      p("Like EDVI, higher values indicate more vigorous vegetation, 
+         but NDVI does not include the blue band correction.")
+      ),
+      
+      # NDVI controls + plot
+      selectInput("ndvi_year", "Select Year:", 2013:2025, selected = 2025),
+      selectInput("ndvi_county", "Select County:",
+                  choices = NULL, multiple = TRUE),
+      withSpinner(
+        plotlyOutput("ndvi_plot", height = "500px"),
+        type = 4, color = "#FDFBF7", size = 0.7
+      )
+    ),
+    
     
     # ---- Placeholder Tabs ----
     tabPanel("Yield Trends",    h3("📈 Yield Trends (Placeholder)")),
-    tabPanel("Remote Sensing",  h3("🛰️ Remote Sensing (Placeholder)")),
-    tabPanel("About",           h3("ℹ️ About (Placeholder)"))
+    tabPanel("About this data",           h3("ℹ️ About (Placeholder)"))
   )
 )
