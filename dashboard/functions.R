@@ -261,70 +261,84 @@ get_soy_ndvi <- function(year, counties = NULL) {
 # Yield Forecast Functions
 # ====================================================================
 
-# ------------------ Load Data -------------------
 data_file <- "soybean_yield_forecast_data.xlsx"
 
+# ---- Annual Data ----
 soy_annual <- readxl::read_excel(data_file, sheet = "Annual_2014_2024") %>%
   mutate(
-    Year             = as.integer(Year),
-    Yield            = as.numeric(Yield),
-    Trend_Yield      = as.numeric(Trend_Yield),
-    Percent_Deviation= as.numeric(Percent_Deviation),
-    mean_EDVI        = as.numeric(mean_EDVI)   # ✅ new EDVI col
+    Year              = as.integer(Year),
+    Yield             = as.numeric(Yield),
+    Trend_Yield       = as.numeric(Trend_Yield),
+    Percent_Deviation = as.numeric(Percent_Deviation),
+    mean_EDVI         = as.numeric(mean_EDVI)   # <- annual mean EDVI
   )
 
+# ---- Weekly Crop Conditions ----
 soy_weekly <- readxl::read_excel(data_file, sheet = "Weekly_Raw") %>%
   mutate(
     Year = as.integer(Year),
     Week = as.Date(Week)
   )
 
+# ---- Weekly EDVI Bands ----
+soy_edvi <- readr::read_csv("Soybeans_WeeklyBands_2013_2025_clean_EDVI.csv",
+                            show_col_types = FALSE) %>%
+  mutate(
+    Year = as.integer(year),
+    Week = as.Date(date)
+  )
 
-# ------------------ Model 1: Crop Conditions Only -------------------
-reg_model_conditions <- lm(
-  Percent_Deviation ~ Excellent + Good + Fair + Poor,
-  data = soy_annual
-)
+# ------------------ Models -------------------
+reg_model_conditions   <- lm(Percent_Deviation ~ Excellent + Good + Fair + Poor, data = soy_annual)
+reg_model_edvi_only    <- lm(Percent_Deviation ~ mean_EDVI, data = soy_annual)
+reg_model_cond_edvi    <- lm(Percent_Deviation ~ Excellent + Good + Fair + Poor + mean_EDVI, data = soy_annual)
 
+# ------------------ Forecast Functions -------------------
+
+# Conditions only
 make_forecasts_conditions <- function(year) {
   conds <- soy_weekly %>% filter(Year == year)
   if (nrow(conds) == 0) return(NULL)
   
-  df <- conds %>%
+  conds %>%
     mutate(
       Forecast_Dev   = predict(reg_model_conditions, newdata = ., allow.new.levels = TRUE),
       Trend_Yield    = predict(lm(Yield ~ Year, data = soy_annual),
                                newdata = data.frame(Year = year)),
-      Forecast_Yield = Trend_Yield * (1 + Forecast_Dev / 100)
-    ) %>%
-    left_join(soy_annual %>% select(Year, Yield), by = "Year")  # add actual yield
-  
-  return(df)
-}
-
-
-# ------------------ Model 2: Conditions + EDVI ----------------------
-reg_model_edvi <- lm(
-  Percent_Deviation ~ Excellent + Good + Fair + Poor + mean_EDVI,
-  data = soy_annual
-)
-
-make_forecasts_edvi <- function(year) {
-  conds <- soy_weekly %>% filter(Year == year)
-  if (nrow(conds) == 0) return(NULL)
-  
-  # Attach the EDVI for that year from soy_annual
-  edvi_val <- soy_annual %>% filter(Year == year) %>% pull(mean_EDVI)
-  
-  df <- conds %>%
-    mutate(
-      mean_EDVI      = edvi_val,   # ✅ bring in EDVI value
-      Forecast_Dev   = predict(reg_model_edvi, newdata = ., allow.new.levels = TRUE),
-      Trend_Yield    = predict(lm(Yield ~ Year, data = soy_annual),
-                               newdata = data.frame(Year = year)),
-      Forecast_Yield = Trend_Yield * (1 + Forecast_Dev / 100)
+      Forecast_Yield = Trend_Yield * (1 + Forecast_Dev/100)
     ) %>%
     left_join(soy_annual %>% select(Year, Yield), by = "Year")
+}
+
+# EDVI only
+make_forecasts_edvi <- function(year) {
+  conds <- soy_edvi %>% filter(Year == year)
+  if (nrow(conds) == 0) return(NULL)
   
-  return(df)
+  conds %>%
+    mutate(
+      Forecast_Dev   = predict(reg_model_edvi_only, newdata = data.frame(mean_EDVI = mean_EDVI)),
+      Trend_Yield    = predict(lm(Yield ~ Year, data = soy_annual),
+                               newdata = data.frame(Year = year)),
+      Forecast_Yield = Trend_Yield * (1 + Forecast_Dev/100)
+    ) %>%
+    left_join(soy_annual %>% select(Year, Yield), by = "Year")
+}
+
+# Conditions + EDVI
+make_forecasts_cond_edvi <- function(year) {
+  conds <- soy_weekly %>% filter(Year == year)
+  if (nrow(conds) == 0) return(NULL)
+  edvi_val <- soy_annual %>% filter(Year == year) %>% pull(mean_EDVI)
+  newdata <- conds %>%
+    mutate(mean_EDVI = edvi_val)
+  
+  newdata %>%
+    mutate(
+      Forecast_Dev   = predict(reg_model_cond_edvi, newdata = newdata, allow.new.levels = TRUE),
+      Trend_Yield    = predict(lm(Yield ~ Year, data = soy_annual),
+                               newdata = data.frame(Year = year)),
+      Forecast_Yield = Trend_Yield * (1 + Forecast_Dev/100)
+    ) %>%
+    left_join(soy_annual %>% select(Year, Yield), by = "Year")
 }

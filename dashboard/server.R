@@ -427,74 +427,135 @@ server <- function(input, output, session) {
   })
   
   # ====================================================================
-  # Yield Forecasts
+  # Yield Forecasts (Server)
   # ====================================================================
   
-  # ---- Conditions-Only Forecast ----
+  # 1️⃣ Conditions-only
   output$yield_forecast_conditions_plot <- renderPlotly({
-    req(input$year_forecast)
-    
-    df <- make_forecasts_conditions(as.integer(input$year_forecast))
+    req(input$year_forecast_conditions)
+    df <- make_forecasts_conditions(as.integer(input$year_forecast_conditions))
     if (is.null(df)) return(NULL)
-    
-    actual <- soy_annual %>% filter(Year == input$year_forecast) %>% pull(Yield)
+    actual <- soy_annual %>% filter(Year == input$year_forecast_conditions) %>% pull(Yield)
     
     p <- ggplot(df, aes(x = Week, y = Forecast_Yield)) +
-      geom_line(color = "#2E8B57", size = 1.2) +   # green line
+      geom_line(color = "#2E8B57", size = 1.2) +
       geom_point(color = "#228B22") +
-      geom_hline(yintercept = actual, color = "#8B0000", linetype = "dashed", size = 1) +
+      geom_hline(yintercept = actual, color = "#8B0000", linetype = "dashed") +
+      labs(title = paste("Conditions-only Forecast —", input$year_forecast_conditions),
+           subtitle = "Green = forecast | Red dashed = actual yield",
+           x = "Week", y = "Yield (bu/acre)") +
+      theme_minimal() +
+      theme(
+        plot.title       = element_text(size = 14, face = "bold", color = "#2E7D32"),
+        axis.text.x      = element_text(angle = 45, hjust = 1),
+        panel.background = element_rect(fill = "#F3E5D0", color = NA),
+        plot.background  = element_rect(fill = "#F3E5D0", color = NA),
+        legend.position  = "bottom"
+      )
+    
+    ggplotly(p)
+  })
+  output$yield_forecast_conditions_summary <- renderText({
+    df <- make_forecasts_conditions(as.integer(input$year_forecast_conditions))
+    if (is.null(df)) return("No data available")
+    actual <- soy_annual %>% filter(Year == input$year_forecast_conditions) %>% pull(Yield)
+    rmse <- sqrt(mean((df$Forecast_Yield - actual)^2, na.rm = TRUE))
+    paste("RMSE (Conditions-only model):", round(rmse, 2), "bu/acre")
+  })
+  
+  # 2️⃣ EDVI Timeseries (across years, replaces EDVI-only weekly)
+  output$yield_forecast_edvi_only_plot <- renderPlotly({
+    req(input$year_forecast_edvi)
+    
+    # Filter all data up to the selected year
+    df_plot <- soy_annual %>% filter(Year <= input$year_forecast_edvi)
+    
+    p <- ggplot(df_plot, aes(x = Year)) +
+      # Actual Yield
+      geom_line(aes(y = Yield, color = "Actual Yield"), size = 1) +
+      geom_point(aes(y = Yield, color = "Actual Yield")) +
+      
+      # Trend Yield
+      geom_line(aes(y = Trend_Yield, color = "Trend Yield"),
+                linetype = "dashed", size = 1) +
+      
+      # EDVI forecast
+      geom_line(aes(y = Trend_Yield * (1 + Percent_Deviation/100),
+                    color = "Forecast (EDVI)"),
+                linetype = "dotted", size = 1) +
+      geom_point(aes(y = Trend_Yield * (1 + Percent_Deviation/100),
+                     color = "Forecast (EDVI)")) +
+      
+      # Optional: Good+Excellent forecast
+      geom_line(aes(y = Trend_Yield * (1 + Percent_Deviation/100),
+                    color = "Forecast (G+E)"),
+                linetype = "dotted", size = 1, alpha = 0.7) +
+      
       labs(
-        title = paste("Forecast from Crop Conditions —", input$year_forecast),
-        subtitle = "Green line = forecast | Red dashed = actual yield",
-        x = "Week", y = "Yield (bu/acre)"
+        title = paste("Soybean Yield Forecast (up to", input$year_forecast_edvi, ")"),
+        y = "Yield (bushels per acre)",
+        x = "Year",
+        subtitle = "Black = Actual | Blue dashed = Trend | Green dotted = EDVI Forecast | Orange dotted = G+E Forecast"
       ) +
-      theme_minimal(base_size = 14)
+      scale_color_manual(values = c(
+        "Actual Yield" = "black",
+        "Trend Yield" = "darkgreen",
+        "Forecast (EDVI)" = "lightgreen",
+        "Forecast (G+E)" = "brown"
+      )) +
+    theme_minimal() +
+    theme(
+      plot.title       = element_text(size = 14, face = "bold", color = "#2E7D32"),
+      axis.text.x      = element_text(angle = 45, hjust = 1),
+      panel.background = element_rect(fill = "#F3E5D0", color = NA),
+      plot.background  = element_rect(fill = "#F3E5D0", color = NA),
+      legend.position  = "bottom"
+    )
     
     ggplotly(p)
   })
   
-  output$yield_forecast_conditions_summary <- renderText({
-    df <- make_forecasts_conditions(as.integer(input$year_forecast))
-    if (is.null(df)) return("No data available")
+  output$yield_forecast_edvi_only_summary <- renderText({
+    df_sub <- soy_annual %>% filter(Year == input$year_forecast_edvi)
+    if (nrow(df_sub) == 0) return("No data available")
     
-    actual <- soy_annual %>% filter(Year == input$year_forecast) %>% pull(Yield)
-    rmse <- sqrt(mean((df$Forecast_Yield - actual)^2, na.rm = TRUE))
-    
-    paste("RMSE (Conditions-only model) for", input$year_forecast, "=", round(rmse, 2), "bu/acre")
+    rmse <- sqrt(mean((df_sub$Trend_Yield * (1 + df_sub$Percent_Deviation/100) -
+                         df_sub$Yield)^2, na.rm = TRUE))
+    paste("RMSE (EDVI timeseries model):", round(rmse, 2), "bu/acre")
   })
   
   
-  # ---- Conditions + EDVI Forecast ----
-  output$yield_forecast_edvi_plot <- renderPlotly({
-    req(input$year_forecast)
-    
-    df <- make_forecasts_edvi(as.integer(input$year_forecast))
+  # 3️⃣ Conditions + EDVI
+  output$yield_forecast_cond_edvi_plot <- renderPlotly({
+    req(input$year_forecast_cond_edvi)
+    df <- make_forecasts_cond_edvi(as.integer(input$year_forecast_cond_edvi))
     if (is.null(df)) return(NULL)
-    
-    actual <- soy_annual %>% filter(Year == input$year_forecast) %>% pull(Yield)
+    actual <- soy_annual %>% filter(Year == input$year_forecast_cond_edvi) %>% pull(Yield)
     
     p <- ggplot(df, aes(x = Week, y = Forecast_Yield)) +
-      geom_line(color = "#006400", size = 1.2) +   # darker green
+      geom_line(color = "#006400", size = 1.2) +
       geom_point(color = "#32CD32") +
-      geom_hline(yintercept = actual, color = "#8B0000", linetype = "dashed", size = 1) +
-      labs(
-        title = paste("Forecast from Crop Conditions + EDVI —", input$year_forecast),
-        subtitle = "Dark green line = forecast | Red dashed = actual yield",
-        x = "Week", y = "Yield (bu/acre)"
-      ) +
-      theme_minimal(base_size = 14)
+      geom_hline(yintercept = actual, color = "#8B0000", linetype = "dashed") +
+      labs(title = paste("Conditions + EDVI Forecast —", input$year_forecast_cond_edvi),
+           subtitle = "Dark green = forecast | Red dashed = actual yield",
+           x = "Week", y = "Yield (bu/acre)") +
+      theme_minimal() +
+      theme(
+        plot.title       = element_text(size = 14, face = "bold", color = "#2E7D32"),
+        axis.text.x      = element_text(angle = 45, hjust = 1),
+        panel.background = element_rect(fill = "#F3E5D0", color = NA),
+        plot.background  = element_rect(fill = "#F3E5D0", color = NA),
+        legend.position  = "bottom"
+      )
     
     ggplotly(p)
   })
-  
-  output$yield_forecast_edvi_summary <- renderText({
-    df <- make_forecasts_edvi(as.integer(input$year_forecast))
+  output$yield_forecast_cond_edvi_summary <- renderText({
+    df <- make_forecasts_cond_edvi(as.integer(input$year_forecast_cond_edvi))
     if (is.null(df)) return("No data available")
-    
-    actual <- soy_annual %>% filter(Year == input$year_forecast) %>% pull(Yield)
+    actual <- soy_annual %>% filter(Year == input$year_forecast_cond_edvi) %>% pull(Yield)
     rmse <- sqrt(mean((df$Forecast_Yield - actual)^2, na.rm = TRUE))
-    
-    paste("RMSE (Conditions + EDVI model) for", input$year_forecast, "=", round(rmse, 2), "bu/acre")
+    paste("RMSE (Conditions + EDVI model):", round(rmse, 2), "bu/acre")
   })
   
   
