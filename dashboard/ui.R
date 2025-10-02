@@ -131,7 +131,6 @@ ui <- fluidPage(
                   choices = 2014:2025, selected = 2025),
       
       # All category plots stacked vertically
-      # All category plots stacked vertically
       lapply(progress_categories, function(cat) {
         safe_id <- paste0("soy_progress_", gsub("[^A-Za-z]", "_", cat))
         tagList(
@@ -280,6 +279,76 @@ ui <- fluidPage(
         type = 4, color = "#FDFBF7", size = 0.7
       )
     ),
+    
+    # ---- Yield Forecast Tab ----
+    tabPanel("Yield Forecasts",
+             h3("📈 Soybean Yield Forecasts"),
+             div(style = "
+           background-color:#4B2E2B;
+           color:#FDFBF7;
+           font-family:'Times New Roman', serif;
+           padding:15px;
+           border-radius:8px;
+           margin-bottom:20px;
+           box-shadow:0 3px 8px rgba(0,0,0,0.2);
+         ",
+         h4("About this Data"),
+         p("These models forecast soybean yields in Virginia based on USDA
+           weekly crop condition reports (2014–2024) and optionally EDVI
+           (Enhanced Difference Vegetation Index)."),
+         p("Dashed red lines = actual yields. Solid green lines = forecasts.")
+             ),
+         
+         # Year selector
+         selectInput("year_forecast", "Select Year:",
+                     choices = sort(unique(soy_annual$Year)),
+                     selected = 2024),
+         
+         # Conditions-only model
+         h4("Forecast Using Crop Conditions Only"),
+         withSpinner(plotlyOutput("yield_forecast_conditions_plot", height = "350px"),
+                     type = 4, color = "#FDFBF7", size = 0.7),
+         textOutput("yield_forecast_conditions_summary"),
+         br(), hr(), br(),
+         
+         # Conditions + EDVI model
+         h4("Forecast Using Crop Conditions + EDVI"),
+         withSpinner(plotlyOutput("yield_forecast_edvi_plot", height = "350px"),
+                     type = 4, color = "#FDFBF7", size = 0.7),
+         textOutput("yield_forecast_edvi_summary")
+    ),
+    
+    
+    # ---- Assistant Helper Tab ----
+    tabPanel("Assistant",
+             h3("🤖 Dashboard Assistant"),
+             div(style = "
+        background-color:#4B2E2B; color:#FDFBF7;
+        padding:15px; border-radius:8px; margin-bottom:20px;
+        box-shadow:0 3px 8px rgba(0,0,0,0.2);",
+        h4("How to Use"),
+        p("This assistant can answer common questions about the dashboard, 
+           forecasts, and data sources. Select a question from the dropdown below.")
+             ),
+        
+        selectInput("faq_question", "Choose a Question:",
+                    choices = c(
+                      "What does the forecast mean?",
+                      "What do the dashed lines show?",
+                      "Where does the data come from?",
+                      "How do I use the planting progress tab?",
+                      "How do I interpret the county map?",
+                      "What are NDVI and EDVI?",
+                      "What years are forecasts available for?"
+                    )
+        ),
+        br(),
+        withSpinner(
+          textOutput("faq_answer"),
+          type = 4, color = "#FDFBF7", size = 0.7
+        )
+    ),
+    
     
     
     # ---- Placeholder Tabs ----

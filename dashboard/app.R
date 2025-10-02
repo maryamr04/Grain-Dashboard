@@ -5,6 +5,7 @@ library(shiny)
 library(tidyr)
 library(rnassqs)
 library(leaflet)
+library(dplyr)
 library(sf)      
 library(tigris)    
 options(tigris_use_cache = TRUE)
@@ -13,6 +14,3 @@ source("functions.R")
 source("ui.R")
 source("server.R")
 shinyApp(ui = ui, server = server)
-
-
-

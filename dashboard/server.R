@@ -9,7 +9,6 @@ library(ggplot2)
 library(leaflet)
 library(sf)      
 library(tigris)  
-library(dplyr)
 options(tigris_use_cache = TRUE)
 
 server <- function(input, output, session) {
@@ -25,7 +24,6 @@ server <- function(input, output, session) {
           req(input$year_sel)
           
           if (input$year_sel %in% 2014:2024) {
-            # Build dataset with both Actual + 5-Year Avg
             actual <- soy_progress %>%
               filter(Year == as.character(input$year_sel),
                      CategoryRaw == category_inner,
@@ -35,10 +33,12 @@ server <- function(input, output, session) {
             avg <- soy_progress %>%
               filter(CategoryRaw == category_inner,
                      Type == "5-Year Avg") %>%
-              select(Year, week, value = five_year_avg_value, Type)
+              transmute(Year, week, CategoryRaw,
+                        value = five_year_avg_value,
+                        Type)
             
             combined <- bind_rows(actual, avg)
-            
+          
           } else if (input$year_sel == 2025) {
             # For 2025, only API Actuals
             combined <- get_soy_progress_data(input$year_sel, category_inner)
@@ -270,10 +270,7 @@ server <- function(input, output, session) {
       df,  
       by = c("County", "State")
     ) %>% st_as_sf()
-    
-    
-    
-    
+
     
     pal <- colorBin(
       palette = c("#8B4513", "#DEB887", "#228B22"),  # earthy: brown → tan → green
@@ -429,5 +426,114 @@ server <- function(input, output, session) {
     ggplotly(gg, tooltip = c("x", "y", "color"))
   })
   
+  # ====================================================================
+  # Yield Forecasts
+  # ====================================================================
+  
+  # ---- Conditions-Only Forecast ----
+  output$yield_forecast_conditions_plot <- renderPlotly({
+    req(input$year_forecast)
+    
+    df <- make_forecasts_conditions(as.integer(input$year_forecast))
+    if (is.null(df)) return(NULL)
+    
+    actual <- soy_annual %>% filter(Year == input$year_forecast) %>% pull(Yield)
+    
+    p <- ggplot(df, aes(x = Week, y = Forecast_Yield)) +
+      geom_line(color = "#2E8B57", size = 1.2) +   # green line
+      geom_point(color = "#228B22") +
+      geom_hline(yintercept = actual, color = "#8B0000", linetype = "dashed", size = 1) +
+      labs(
+        title = paste("Forecast from Crop Conditions —", input$year_forecast),
+        subtitle = "Green line = forecast | Red dashed = actual yield",
+        x = "Week", y = "Yield (bu/acre)"
+      ) +
+      theme_minimal(base_size = 14)
+    
+    ggplotly(p)
+  })
+  
+  output$yield_forecast_conditions_summary <- renderText({
+    df <- make_forecasts_conditions(as.integer(input$year_forecast))
+    if (is.null(df)) return("No data available")
+    
+    actual <- soy_annual %>% filter(Year == input$year_forecast) %>% pull(Yield)
+    rmse <- sqrt(mean((df$Forecast_Yield - actual)^2, na.rm = TRUE))
+    
+    paste("RMSE (Conditions-only model) for", input$year_forecast, "=", round(rmse, 2), "bu/acre")
+  })
+  
+  
+  # ---- Conditions + EDVI Forecast ----
+  output$yield_forecast_edvi_plot <- renderPlotly({
+    req(input$year_forecast)
+    
+    df <- make_forecasts_edvi(as.integer(input$year_forecast))
+    if (is.null(df)) return(NULL)
+    
+    actual <- soy_annual %>% filter(Year == input$year_forecast) %>% pull(Yield)
+    
+    p <- ggplot(df, aes(x = Week, y = Forecast_Yield)) +
+      geom_line(color = "#006400", size = 1.2) +   # darker green
+      geom_point(color = "#32CD32") +
+      geom_hline(yintercept = actual, color = "#8B0000", linetype = "dashed", size = 1) +
+      labs(
+        title = paste("Forecast from Crop Conditions + EDVI —", input$year_forecast),
+        subtitle = "Dark green line = forecast | Red dashed = actual yield",
+        x = "Week", y = "Yield (bu/acre)"
+      ) +
+      theme_minimal(base_size = 14)
+    
+    ggplotly(p)
+  })
+  
+  output$yield_forecast_edvi_summary <- renderText({
+    df <- make_forecasts_edvi(as.integer(input$year_forecast))
+    if (is.null(df)) return("No data available")
+    
+    actual <- soy_annual %>% filter(Year == input$year_forecast) %>% pull(Yield)
+    rmse <- sqrt(mean((df$Forecast_Yield - actual)^2, na.rm = TRUE))
+    
+    paste("RMSE (Conditions + EDVI model) for", input$year_forecast, "=", round(rmse, 2), "bu/acre")
+  })
+  
+  
+  
+  # ====================================================================
+  # Assistant Bot?
+  # ====================================================================
+  
+  # ---------------------- Assistant Helper --------------------------
+  faq_answers <- list(
+    "What does the forecast mean?" =
+      "The forecast shows predicted soybean yields based on crop conditions (Good + Excellent) and historical yield trends.",
+    
+    "What do the dashed lines show?" =
+      "Dashed lines represent the trend yield (baseline yield expected without unusual conditions).",
+    
+    "Where does the data come from?" =
+      "All data comes from USDA NASS survey datasets and satellite-based remote sensing (NDVI, EDVI, MODIS temperature).",
+    
+    "How do I use the planting progress tab?" =
+      "Select a year from 2014–2025 to compare weekly planting/development progress with the 5-year average.",
+    
+    "How do I interpret the county map?" =
+      "Hover over each county to see acres planted, harvested, and harvest success rate. Darker colors mean higher values.",
+    
+    "What are NDVI and EDVI?" =
+      "NDVI (Normalized Difference Vegetation Index) measures vegetation greenness. EDVI is an enhanced version that uses the blue band to reduce soil/atmosphere noise.",
+    
+    "What years are forecasts available for?" =
+      "Forecasts are built for 2014–2024 (historical actual vs. forecast) and 2025 (live conditions, no actual yield yet)."
+  )
+  
+  output$faq_answer <- renderText({
+    req(input$faq_question)
+    faq_answers[[input$faq_question]]
+  })
+  
+  
+  
   
 }
+
