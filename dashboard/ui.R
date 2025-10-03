@@ -285,74 +285,101 @@ ui <- fluidPage(
              h3("Soybean Yield Forecasts"),
              
              div(style = "
-     background-color:#4B2E2B;
-     color:#FDFBF7;
+      background-color:#4B2E2B;
+      color:#FDFBF7;
+      font-family:'Times New Roman', serif;
+      padding:15px; border-radius:8px;
+      margin-bottom:20px;
+      box-shadow:0 3px 8px rgba(0,0,0,0.2);",
+      h4("About this Data"),
+      p("This section demonstrates three different approaches to forecasting Virginia soybean yields.
+          Each model is built using historical USDA yield data (2014–2024) and additional weekly or
+         satellite-based predictors.  The purpose is to show how different information sources
+         contribute to prediction accuracy."),
+      tags$ul(
+        # Conditions-only model
+        tags$li(
+          strong("Conditions-only model:"),
+          "This model uses only USDA weekly crop condition reports. Each week, soybeans are classified into categories
+          such as Excellent, Good, Fair, Poor, and Very Poor. The share of soybeans in each category is used to estimate
+          how much yield in that year will deviate from the long-term trend. Steps:"
+        ),
+        
+        tags$li(
+          strong("EDVI-only model:"),
+          "This model relies entirely on satellite-derived vegetation health.
+          The Enhanced Difference Vegetation Index (EDVI) is calculated from Landsat or MODIS imagery
+          and summarizes canopy greenness and crop vigor. Unlike crop conditions, EDVI is objective and consistent. Steps:"
+        ),
+        
+        tags$li(
+          strong("Hybrid model (Conditions + EDVI):"),
+          "This model combines both data sources — USDA weekly crop conditions and satellite-derived EDVI —
+          into a single regression model. Steps:"
+        )
+      )
+             ),
+      
+      p("Dashed red lines represent actual USDA-reported yields.
+        Solid blue lines indicate the long-term trend.
+        Green/orange dotted lines represent forecasts from each model.
+        The comparison highlights whether adding EDVI improves accuracy over conditions alone."),
+      
+      # Model 1
+      h4("Forecast Using Crop Conditions Only"),
+      selectInput("year_forecast_conditions", "Select Year (Conditions):",
+                  choices = sort(unique(soy_annual$Year)), selected = 2024),
+      withSpinner(plotlyOutput("yield_forecast_conditions_plot", height = "350px"),
+                  type = 4, color = "#FDFBF7", size = 0.7),
+      textOutput("yield_forecast_conditions_summary"),
+      
+      br(), hr(), br(),
+      
+      # Model 2
+      h4("Forecast Using EDVI Only"),
+      selectInput("year_forecast_edvi", "Select Year (EDVI):",
+                  choices = sort(unique(soy_annual$Year)), selected = 2024),
+      withSpinner(plotlyOutput("yield_forecast_edvi_only_plot", height = "350px"),
+                  type = 4, color = "#FDFBF7", size = 0.7),
+      textOutput("yield_forecast_edvi_only_summary"),
+      
+      br(), hr(), br(),
+      
+      # Model 3
+      h4("Forecast Using Conditions + EDVI"),
+      selectInput("year_forecast_cond_edvi", "Select Year (Conditions + EDVI):",
+                  choices = sort(unique(soy_annual$Year)), selected = 2024),
+      withSpinner(plotlyOutput("yield_forecast_cond_edvi_plot", height = "350px"),
+                  type = 4, color = "#FDFBF7", size = 0.7),
+      textOutput("yield_forecast_cond_edvi_summary"),
+      
+      br(), hr(), br(),
+      
+      # Model 4
+      h4("Forecast Using ARIMAX (Time-Series + Predictors)"),
+      div(style = "
+     background-color:#4B2E2B;   /* dark brown */
+     color:#FDFBF7;              /* white text */
      font-family:'Times New Roman', serif;
-     padding:15px; border-radius:8px;
+     padding:15px;
+     border-radius:8px;
      margin-bottom:20px;
      box-shadow:0 3px 8px rgba(0,0,0,0.2);",
-     h4("About this Data"),
-     p("This section demonstrates three different approaches to forecasting Virginia soybean yields.  
-       Each model is built using historical USDA yield data (2014–2024) and additional weekly or 
-       satellite-based predictors.  The purpose is to show how different information sources 
-       contribute to prediction accuracy."),
-     tags$ul(
-       # Conditions-only model
-       tags$li(
-         strong("Conditions-only model:"),
-         "This model uses only USDA weekly crop condition reports. Each week, soybeans are classified into categories 
-        such as Excellent, Good, Fair, Poor, and Very Poor. The share of soybeans in each category is used to estimate 
-        how much yield in that year will deviate from the long-term trend. Steps:",
-       ),
-       
-       tags$li(
-         strong("EDVI-only model:"),
-         "This model relies entirely on satellite-derived vegetation health. 
-        The Enhanced Difference Vegetation Index (EDVI) is calculated from Landsat or MODIS imagery 
-        and summarizes canopy greenness and crop vigor. Unlike crop conditions, EDVI is objective and consistent. Steps:",
-       ),
-       
-       tags$li(
-         strong("Hybrid model (Conditions + EDVI):"),
-         "This model combines both data sources — USDA weekly crop conditions and satellite-derived EDVI — 
-        into a single regression model. Steps:",
-       )
-     )
-             ), 
-     
-     p("Dashed red lines represent actual USDA-reported yields.  
-     Solid blue lines indicate the long-term trend.  
-     Green/orange dotted lines represent forecasts from each model.  
-     The comparison highlights whether adding EDVI improves accuracy over conditions alone."),
-     
-     # Model 1
-     h4("Forecast Using Crop Conditions Only"),
-     selectInput("year_forecast_conditions", "Select Year (Conditions):",
-                 choices = sort(unique(soy_annual$Year)), selected = 2024),
-     withSpinner(plotlyOutput("yield_forecast_conditions_plot", height = "350px"),
+     p("This model goes beyond simple regression by using an ARIMAX approach.
+       ARIMAX combines time-series dynamics (Auto-Regressive Integrated Moving Average)
+       with external predictors such as EDVI and USDA crop condition categories.
+       By incorporating both the historical yield trajectory and yearly predictors,
+       it can capture yield momentum and shocks while adjusting for explanatory variables.
+       This often results in more accurate forecasts compared to models that rely
+       only on trend, conditions, or EDVI.")
+      ),
+     withSpinner(plotlyOutput("yield_forecast_arimax_plot", height = "350px"),
                  type = 4, color = "#FDFBF7", size = 0.7),
-     textOutput("yield_forecast_conditions_summary"),
+     textOutput("yield_forecast_arimax_summary")
      
-     br(), hr(), br(),
-     
-     # Model 2
-     h4("Forecast Using EDVI Only"),
-     selectInput("year_forecast_edvi", "Select Year (EDVI):",
-                 choices = sort(unique(soy_annual$Year)), selected = 2024),
-     withSpinner(plotlyOutput("yield_forecast_edvi_only_plot", height = "350px"),
-                 type = 4, color = "#FDFBF7", size = 0.7),
-     textOutput("yield_forecast_edvi_only_summary"),
-     
-     br(), hr(), br(),
-     
-     # Model 3
-     h4("Forecast Using Conditions + EDVI"),
-     selectInput("year_forecast_cond_edvi", "Select Year (Conditions + EDVI):",
-                 choices = sort(unique(soy_annual$Year)), selected = 2024),
-     withSpinner(plotlyOutput("yield_forecast_cond_edvi_plot", height = "350px"),
-                 type = 4, color = "#FDFBF7", size = 0.7),
-     textOutput("yield_forecast_cond_edvi_summary")
     ),
+    
+    
     
     tabPanel("Feedback / FAQ",
              h3("💬 Feedback Form"),
@@ -371,7 +398,6 @@ ui <- fluidPage(
     
     
     # ---- Placeholder Tabs ----
-    tabPanel("Yield Trends",    h3("📈 Yield Trends (Placeholder)")),
     tabPanel("About this data",           h3("ℹ️ About (Placeholder)"))
   )
 )

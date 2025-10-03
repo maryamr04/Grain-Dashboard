@@ -558,6 +558,53 @@ server <- function(input, output, session) {
     paste("RMSE (Conditions + EDVI model):", round(rmse, 2), "bu/acre")
   })
   
+  # 4️⃣ ARIMAX Forecast
+  output$yield_forecast_arimax_plot <- renderPlotly({
+    df <- make_forecasts_arimax(start_year = 2018, end_year = max(soy_annual$Year))
+    if (is.null(df) || nrow(df) == 0) return(NULL)
+    
+    p <- ggplot(df, aes(x = Year)) +
+      geom_line(aes(y = Actual, color = "Actual Yield"), size = 1.2) +
+      geom_point(aes(y = Actual, color = "Actual Yield")) +
+      
+      geom_line(aes(y = Forecast, color = "ARIMAX Forecast"), size = 1.2) +
+      geom_point(aes(y = Forecast, color = "ARIMAX Forecast"), size = 2) +
+      
+      geom_ribbon(aes(ymin = Lower, ymax = Upper), fill = "lightgreen", alpha = 0.3) +
+      
+      labs(
+        title = "ARIMAX Forecasts (Year-by-Year)",
+        subtitle = "Black = Actual | Green = Forecast + CI",
+        x = "Year", y = "Yield (bu/acre)"
+      ) +
+      scale_color_manual(values = c(
+        "Actual Yield" = "black",
+        "ARIMAX Forecast" = "#228B22"
+      )) +
+      theme_minimal() +
+      theme(
+        plot.title       = element_text(size = 14, face = "bold", color = "#2E7D32"),
+        axis.text.x      = element_text(angle = 45, hjust = 1),
+        panel.background = element_rect(fill = "#F3E5D0", color = NA),
+        plot.background  = element_rect(fill = "#F3E5D0", color = NA),
+        legend.position  = "bottom"
+      )
+    
+    ggplotly(p)
+  })
+  
+  output$yield_forecast_arimax_summary <- renderText({
+    df <- make_forecasts_arimax(start_year = 2018, end_year = max(soy_annual$Year))
+    if (is.null(df) || nrow(df) == 0) return("No data available")
+    
+    rmse <- sqrt(mean((df$Forecast - df$Actual)^2, na.rm = TRUE))
+    
+    paste(
+      "ARIMAX Model RMSE across years:", round(rmse, 2), "bu/acre"
+    )
+  })
+  
+  
   
   
   # ====================================================================
