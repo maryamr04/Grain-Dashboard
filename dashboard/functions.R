@@ -342,3 +342,47 @@ make_forecasts_cond_edvi <- function(year) {
     ) %>%
     left_join(soy_annual %>% select(Year, Yield), by = "Year")
 }
+
+
+# ====================================================================
+# Feedback Helpers
+# ====================================================================
+library(openxlsx)
+
+feedback_file <- "feedback_log.xlsx"  
+
+save_feedback <- function(name, feedback) {
+  new_entry <- data.frame(
+    timestamp = as.character(Sys.time()),
+    name = name,
+    feedback = feedback,
+    stringsAsFactors = FALSE
+  )
+  
+  if (file.exists(feedback_file)) {
+    old_data <- read.xlsx(feedback_file)
+    updated_data <- rbind(old_data, new_entry)
+  } else {
+    updated_data <- new_entry
+  }
+  
+  write.xlsx(updated_data, feedback_file, overwrite = TRUE)
+}
+
+faq_answers <- list(
+  "What does the forecast mean?" =
+    "The forecast shows predicted soybean yields based on crop conditions (Good + Excellent) and historical yield trends.",
+  "What do the dashed lines show?" =
+    "Dashed lines represent the trend yield (baseline yield expected without unusual conditions).",
+  "Where does the data come from?" =
+    "All data comes from USDA NASS survey datasets and satellite-based remote sensing (NDVI, EDVI, MODIS temperature).",
+  "How do I use the planting progress tab?" =
+    "Select a year from 2014–2025 to compare weekly planting/development progress with the 5-year average.",
+  "How do I interpret the county map?" =
+    "Hover over each county to see acres planted, harvested, and harvest success rate. Darker colors mean higher values.",
+  "What are NDVI and EDVI?" =
+    "NDVI (Normalized Difference Vegetation Index) measures vegetation greenness. EDVI is an enhanced version that uses the blue band to reduce soil/atmosphere noise.",
+  "What years are forecasts available for?" =
+    "Forecasts are built for 2014–2024 (historical actual vs. forecast) and 2025 (live conditions, no actual yield yet)."
+)
+

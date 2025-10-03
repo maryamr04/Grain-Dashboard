@@ -593,6 +593,19 @@ server <- function(input, output, session) {
     faq_answers[[input$faq_question]]
   })
   
+  # ---------------- Feedback Handling ----------------
+  observeEvent(input$submit_feedback, {
+    req(input$user_feedback)
+    
+    save_feedback(input$user_name, input$user_feedback)
+    
+    output$feedback_message <- renderText("✅ Thanks for your feedback! It has been recorded.")
+    
+    updateTextInput(session, "user_name", value = "")
+    updateTextAreaInput(session, "user_feedback", value = "")
+  })
+  
+  
   
   
   

@@ -354,6 +354,22 @@ ui <- fluidPage(
      textOutput("yield_forecast_cond_edvi_summary")
     ),
     
+    tabPanel("Feedback / FAQ",
+             h3("💬 Feedback Form"),
+             textInput("user_name", "Your Name (optional):"),
+             textAreaInput("user_feedback", "Your Feedback:", "", width = "100%", height = "120px"),
+             actionButton("submit_feedback", "Submit"),
+             br(), br(),
+             textOutput("feedback_message"),
+             hr(),
+             
+             h3("📖 FAQ"),
+             selectInput("faq_question", "Choose a question:", 
+                         choices = names(faq_answers), selected = names(faq_answers)[1]),
+             textOutput("faq_answer")
+    ),
+    
+    
     # ---- Placeholder Tabs ----
     tabPanel("Yield Trends",    h3("📈 Yield Trends (Placeholder)")),
     tabPanel("About this data",           h3("ℹ️ About (Placeholder)"))
