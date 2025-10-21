@@ -375,7 +375,39 @@ ui <- fluidPage(
       ),
      withSpinner(plotlyOutput("yield_forecast_arimax_plot", height = "350px"),
                  type = 4, color = "#FDFBF7", size = 0.7),
-     textOutput("yield_forecast_arimax_summary")
+     textOutput("yield_forecast_arimax_summary"),
+     
+     br(), hr(), br(),
+     
+     h4("Model Comparison: All Forecasting Approaches (by Available Years)"),
+     
+     div(style = "
+  background-color:#4B2E2B;
+  color:#FDFBF7;
+  font-family:'Times New Roman', serif;
+  padding:15px;
+  border-radius:8px;
+  margin-bottom:20px;
+  box-shadow:0 3px 8px rgba(0,0,0,0.2);
+",
+p("This visualization compares all four models — Conditions-only, EDVI-only, 
+   Conditions + EDVI, and ARIMAX — along with the actual and trend yields. 
+   Each line only covers the years where data exist for that model, 
+   so the time spans differ slightly across models."),
+p("• Black line = Actual yield"),
+p("• Blue dashed line = Trend yield"),
+p("• Green line = Conditions-only forecast"),
+p("• Teal line = EDVI-only forecast"),
+p("• Orange line = Hybrid forecast (Conditions + EDVI)"),
+p("• Red line = ARIMAX forecast (time-series)")
+     ),
+     
+     withSpinner(
+       plotlyOutput("yield_forecast_comparison_plot", height = "400px"),
+       type = 4, color = "#FDFBF7", size = 0.7
+     ),
+     textOutput("yield_forecast_comparison_summary")
+     
      
     ),
     
@@ -401,3 +433,4 @@ ui <- fluidPage(
     tabPanel("About this data",           h3("ℹ️ About (Placeholder)"))
   )
 )
+

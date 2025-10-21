@@ -604,6 +604,124 @@ server <- function(input, output, session) {
     )
   })
   
+  # ================================================================
+  # --- Smart Model Comparison Plot (Yearly, model-specific years)
+  # ================================================================
+  output$yield_forecast_comparison_plot <- renderPlotly({
+    # === Individual model forecasts (only for valid years) ===
+    
+    # Conditions-only
+    cond_df <- soy_annual %>%
+      mutate(Forecast_Yield = Trend_Yield * (1 + predict(reg_model_conditions, newdata = ., allow.new.levels = TRUE)/100),
+             Model = "Conditions Only") %>%
+      select(Year, Forecast_Yield, Model)
+    
+    # EDVI-only
+    edvi_df <- soy_annual %>%
+      mutate(Forecast_Yield = Trend_Yield * (1 + predict(reg_model_edvi_only, newdata = ., allow.new.levels = TRUE)/100),
+             Model = "EDVI Only") %>%
+      select(Year, Forecast_Yield, Model)
+    
+    # Conditions + EDVI (Hybrid)
+    hybrid_df <- soy_annual %>%
+      mutate(Forecast_Yield = Trend_Yield * (1 + predict(reg_model_cond_edvi, newdata = ., allow.new.levels = TRUE)/100),
+             Model = "Conditions + EDVI") %>%
+      select(Year, Forecast_Yield, Model)
+    
+    # ARIMAX (valid only for certain years)
+    arimax_df <- make_forecasts_arimax(start_year = 2018, end_year = max(soy_annual$Year)) %>%
+      rename(Forecast_Yield = Forecast) %>%
+      mutate(Model = "ARIMAX") %>%
+      select(Year, Forecast_Yield, Model)
+    
+    # Actual yields (always available)
+    actual_df <- soy_annual %>%
+      select(Year, Forecast_Yield = Yield) %>%
+      mutate(Model = "Actual Yield")
+    
+    # Trend yield (baseline)
+    trend_df <- soy_annual %>%
+      select(Year, Forecast_Yield = Trend_Yield) %>%
+      mutate(Model = "Trend Yield")
+    
+    # Combine all
+    combined <- bind_rows(actual_df, trend_df, cond_df, edvi_df, hybrid_df, arimax_df)
+    
+    # === Plot ===
+    gg <- ggplot(combined, aes(x = Year, y = Forecast_Yield, color = Model, linetype = Model)) +
+      geom_line(linewidth = 1.2) +
+      geom_point(size = 2) +
+      labs(
+        title = "Soybean Yield Forecast Comparison (Model-Specific Years)",
+        subtitle = "Each line shows years where model data are available",
+        x = "Year",
+        y = "Yield (bu/acre)"
+      ) +
+      scale_color_manual(values = c(
+        "Actual Yield" = "black",
+        "Trend Yield" = "#1E90FF",
+        "Conditions Only" = "#2E7D32",
+        "EDVI Only" = "#0066CC",
+        "Conditions + EDVI" = "#FFA500",
+        "ARIMAX" = "#8B0000"
+      )) +
+      scale_linetype_manual(values = c(
+        "Actual Yield" = "solid",
+        "Trend Yield" = "dashed",
+        "Conditions Only" = "solid",
+        "EDVI Only" = "solid",
+        "Conditions + EDVI" = "solid",
+        "ARIMAX" = "solid"
+      )) +
+      theme_minimal() +
+      theme(
+        plot.title = element_text(size = 15, face = "bold", color = "#2E7D32"),
+        axis.text.x = element_text(angle = 45, hjust = 1),
+        panel.background = element_rect(fill = "#F3E5D0", color = NA),
+        plot.background = element_rect(fill = "#F3E5D0", color = NA),
+        legend.position = "bottom"
+      )
+    
+    ggplotly(gg, tooltip = c("x", "y", "color"))
+  })
+  
+  
+  output$yield_forecast_comparison_summary <- renderText({
+    df_arimax <- make_forecasts_arimax(start_year = 2018, end_year = max(soy_annual$Year))
+    
+    # Calculate RMSE using only overlapping years for fairness
+    overlap <- function(pred, actual) {
+      shared <- intersect(pred$Year, actual$Year)
+      pred <- pred %>% filter(Year %in% shared)
+      actual <- actual %>% filter(Year %in% shared)
+      sqrt(mean((pred$Forecast_Yield - actual$Yield)^2, na.rm = TRUE))
+    }
+    
+    actual <- soy_annual %>% select(Year, Yield)
+    
+    rmse_cond <- overlap(
+      soy_annual %>% mutate(Forecast_Yield = Trend_Yield * (1 + predict(reg_model_conditions, newdata = ., allow.new.levels = TRUE)/100)),
+      actual
+    )
+    rmse_edvi <- overlap(
+      soy_annual %>% mutate(Forecast_Yield = Trend_Yield * (1 + predict(reg_model_edvi_only, newdata = ., allow.new.levels = TRUE)/100)),
+      actual
+    )
+    rmse_hybrid <- overlap(
+      soy_annual %>% mutate(Forecast_Yield = Trend_Yield * (1 + predict(reg_model_cond_edvi, newdata = ., allow.new.levels = TRUE)/100)),
+      actual
+    )
+    rmse_arimax <- overlap(df_arimax %>% rename(Forecast_Yield = Forecast), actual)
+    
+    paste0(
+      "Model RMSEs — Conditions: ", round(rmse_cond, 2),
+      " | EDVI: ", round(rmse_edvi, 2),
+      " | Hybrid: ", round(rmse_hybrid, 2),
+      " | ARIMAX: ", round(rmse_arimax, 2)
+    )
+  })
+  
+  
   
   
   
