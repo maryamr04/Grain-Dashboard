@@ -608,63 +608,60 @@ server <- function(input, output, session) {
   # --- Smart Model Comparison Plot (Yearly, model-specific years)
   # ================================================================
   output$yield_forecast_comparison_plot <- renderPlotly({
+    
     # === Individual model forecasts (only for valid years) ===
     
-    # Conditions-only
     cond_df <- soy_annual %>%
       mutate(Forecast_Yield = Trend_Yield * (1 + predict(reg_model_conditions, newdata = ., allow.new.levels = TRUE)/100),
              Model = "Conditions Only") %>%
       select(Year, Forecast_Yield, Model)
     
-    # EDVI-only
     edvi_df <- soy_annual %>%
       mutate(Forecast_Yield = Trend_Yield * (1 + predict(reg_model_edvi_only, newdata = ., allow.new.levels = TRUE)/100),
              Model = "EDVI Only") %>%
       select(Year, Forecast_Yield, Model)
     
-    # Conditions + EDVI (Hybrid)
     hybrid_df <- soy_annual %>%
       mutate(Forecast_Yield = Trend_Yield * (1 + predict(reg_model_cond_edvi, newdata = ., allow.new.levels = TRUE)/100),
              Model = "Conditions + EDVI") %>%
       select(Year, Forecast_Yield, Model)
     
-    # ARIMAX (valid only for certain years)
     arimax_df <- make_forecasts_arimax(start_year = 2018, end_year = max(soy_annual$Year)) %>%
       rename(Forecast_Yield = Forecast) %>%
       mutate(Model = "ARIMAX") %>%
       select(Year, Forecast_Yield, Model)
     
-    # Actual yields (always available)
-    actual_df <- soy_annual %>%
+    actual_df <- soy_annual %>% 
       select(Year, Forecast_Yield = Yield) %>%
       mutate(Model = "Actual Yield")
     
-    # Trend yield (baseline)
     trend_df <- soy_annual %>%
       select(Year, Forecast_Yield = Trend_Yield) %>%
       mutate(Model = "Trend Yield")
     
-    # Combine all
     combined <- bind_rows(actual_df, trend_df, cond_df, edvi_df, hybrid_df, arimax_df)
+    
+    # 🌿 Nature-inspired color palette
+    nature_colors <- c(
+      "Actual Yield"      = "#2F3E46",  # dark soil green-gray
+      "Trend Yield"       = "#6BA292",  # sage green
+      "Conditions Only"   = "#A8B545",  # olive green
+      "EDVI Only"         = "#5CA4A9",  # teal blue
+      "Conditions + EDVI" = "#D6A75A",  # golden harvest
+      "ARIMAX"            = "#8B4513"   # rich brown
+    )
     
     # === Plot ===
     gg <- ggplot(combined, aes(x = Year, y = Forecast_Yield, color = Model, linetype = Model)) +
-      geom_line(linewidth = 1.2) +
-      geom_point(size = 2) +
+      geom_line(linewidth = 1.2, na.rm = TRUE) +
+      geom_point(size = 2.5, na.rm = TRUE) +
       labs(
-        title = "Soybean Yield Forecast Comparison (Model-Specific Years)",
-        subtitle = "Each line shows years where model data are available",
+        title = "🌾 Soybean Yield Forecast Comparison (2014–2025)",
+        subtitle = "Each model shown by year; all years spaced evenly across the timeline",
         x = "Year",
-        y = "Yield (bu/acre)"
+        y = "Yield (bushels per acre)"
       ) +
-      scale_color_manual(values = c(
-        "Actual Yield" = "black",
-        "Trend Yield" = "#1E90FF",
-        "Conditions Only" = "#2E7D32",
-        "EDVI Only" = "#0066CC",
-        "Conditions + EDVI" = "#FFA500",
-        "ARIMAX" = "#8B0000"
-      )) +
+      scale_color_manual(values = nature_colors) +
       scale_linetype_manual(values = c(
         "Actual Yield" = "solid",
         "Trend Yield" = "dashed",
@@ -673,17 +670,27 @@ server <- function(input, output, session) {
         "Conditions + EDVI" = "solid",
         "ARIMAX" = "solid"
       )) +
-      theme_minimal() +
+      # 👇 Force every year to display on x-axis
+      scale_x_continuous(breaks = seq(2014, 2025, 1), expand = c(0.01, 0.01)) +
+      theme_minimal(base_family = "Times New Roman") +
       theme(
-        plot.title = element_text(size = 15, face = "bold", color = "#2E7D32"),
-        axis.text.x = element_text(angle = 45, hjust = 1),
-        panel.background = element_rect(fill = "#F3E5D0", color = NA),
         plot.background = element_rect(fill = "#F3E5D0", color = NA),
-        legend.position = "bottom"
+        panel.background = element_rect(fill = "#F3E5D0", color = NA),
+        panel.grid.major = element_line(color = "#DCC7A1", linewidth = 0.4),
+        panel.grid.minor = element_blank(),
+        axis.text = element_text(color = "#4B2E2B"),
+        axis.title = element_text(color = "#4B2E2B", face = "bold"),
+        plot.title = element_text(color = "#3E2C23", face = "bold", size = 18),
+        plot.subtitle = element_text(color = "#4B2E2B", size = 13),
+        legend.position = "bottom",
+        legend.title = element_blank(),
+        legend.text = element_text(color = "#4B2E2B")
       )
     
-    ggplotly(gg, tooltip = c("x", "y", "color"))
+    ggplotly(gg) %>%
+      layout(legend = list(orientation = "h", y = -0.25))
   })
+  
   
   
   output$yield_forecast_comparison_summary <- renderText({
@@ -721,9 +728,65 @@ server <- function(input, output, session) {
     )
   })
   
+  output$model_rmse_table <- renderUI({
+    df_arimax <- make_forecasts_arimax(start_year = 2018, end_year = max(soy_annual$Year))
+    
+    overlap_rmse <- function(pred, actual) {
+      shared <- intersect(pred$Year, actual$Year)
+      pred <- pred %>% filter(Year %in% shared)
+      actual <- actual %>% filter(Year %in% shared)
+      sqrt(mean((pred$Forecast_Yield - actual$Yield)^2, na.rm = TRUE))
+    }
+    
+    actual <- soy_annual %>% select(Year, Yield)
+    
+    rmse_cond <- overlap_rmse(
+      soy_annual %>% mutate(Forecast_Yield = Trend_Yield *
+                              (1 + predict(reg_model_conditions, newdata = ., allow.new.levels = TRUE)/100)),
+      actual
+    )
+    
+    rmse_edvi <- overlap_rmse(
+      soy_annual %>% mutate(Forecast_Yield = Trend_Yield *
+                              (1 + predict(reg_model_edvi_only, newdata = ., allow.new.levels = TRUE)/100)),
+      actual
+    )
+    
+    rmse_hybrid <- overlap_rmse(
+      soy_annual %>% mutate(Forecast_Yield = Trend_Yield *
+                              (1 + predict(reg_model_cond_edvi, newdata = ., allow.new.levels = TRUE)/100)),
+      actual
+    )
+    
+    rmse_arimax <- overlap_rmse(
+      df_arimax %>% rename(Forecast_Yield = Forecast),
+      actual
+    )
+    
+    # Build and format the table
+    df <- tibble::tibble(
+      Model = c("Conditions Only", "EDVI Only", "Conditions + EDVI", "ARIMAX"),
+      RMSE = round(c(rmse_cond, rmse_edvi, rmse_hybrid, rmse_arimax), 2)
+    ) %>%
+      arrange(RMSE)
+    
+    # 🌿 Styled dark-green & white table
+    HTML(
+      df %>%
+        knitr::kable(format = "html", align = "c", col.names = c("Model", "RMSE (bu/acre)")) %>%
+        kableExtra::kable_styling(
+          full_width = FALSE,
+          position = "center",
+          bootstrap_options = c("striped", "hover", "condensed")
+        ) %>%
+        kableExtra::row_spec(0, background = "#004d00", color = "white", bold = TRUE) %>%    
+        kableExtra::row_spec(1:nrow(df), background = "#e8f5e9", color = "black") %>%        
+        kableExtra::column_spec(2, bold = TRUE, color = "#1b5e20")                        
+    )
+  })
   
-  
-  
+    
+    
   
   # ====================================================================
   # Assistant Bot?
@@ -769,9 +832,6 @@ server <- function(input, output, session) {
     updateTextInput(session, "user_name", value = "")
     updateTextAreaInput(session, "user_feedback", value = "")
   })
-  
-  
-  
   
   
 }

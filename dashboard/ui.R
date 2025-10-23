@@ -5,6 +5,8 @@ library(shiny)
 library(plotly)
 library(shinycssloaders)
 library(tidyr)
+library(kableExtra)
+
 
 years <- 2014:2025
 categories <- c("PCT PLANTED", "PCT EMERGED", "PCT BLOOMING",
@@ -379,7 +381,7 @@ ui <- fluidPage(
      
      br(), hr(), br(),
      
-     h4("Model Comparison: All Forecasting Approaches (by Available Years)"),
+     h4("🌾 Model Comparison: All Forecasting Approaches (2014–2025)"),
      
      div(style = "
   background-color:#4B2E2B;
@@ -390,26 +392,63 @@ ui <- fluidPage(
   margin-bottom:20px;
   box-shadow:0 3px 8px rgba(0,0,0,0.2);
 ",
-p("This visualization compares all four models — Conditions-only, EDVI-only, 
-   Conditions + EDVI, and ARIMAX — along with the actual and trend yields. 
-   Each line only covers the years where data exist for that model, 
-   so the time spans differ slightly across models."),
-p("• Black line = Actual yield"),
-p("• Blue dashed line = Trend yield"),
-p("• Green line = Conditions-only forecast"),
-p("• Teal line = EDVI-only forecast"),
-p("• Orange line = Hybrid forecast (Conditions + EDVI)"),
-p("• Red line = ARIMAX forecast (time-series)")
+p("This visualization compares all four forecasting models — Conditions-only, EDVI-only, 
+   Conditions + EDVI, and ARIMAX — alongside the actual and trend yields."),
+p("Each model covers its valid data years, but the timeline displays all years (2014–2025) 
+   for easier comparison."),
+tags$ul(
+  tags$li("🖤 Black line = Actual yield"),
+  tags$li("🟦 Blue dashed line = Trend yield"),
+  tags$li("🟩 Green line = Conditions-only forecast"),
+  tags$li("🟦 Teal line = EDVI-only forecast"),
+  tags$li("🟧 Orange line = Hybrid forecast (Conditions + EDVI)"),
+  tags$li("🟥 Brown line = ARIMAX forecast (time-series)")
+)
      ),
-     
-     withSpinner(
-       plotlyOutput("yield_forecast_comparison_plot", height = "400px"),
-       type = 4, color = "#FDFBF7", size = 0.7
-     ),
-     textOutput("yield_forecast_comparison_summary")
-     
-     
-    ),
+
+withSpinner(
+  plotlyOutput("yield_forecast_comparison_plot", height = "450px", width = "100%"),
+  type = 4, color = "#FDFBF7", size = 0.7
+),
+
+textOutput("yield_forecast_comparison_summary"),
+
+br(), hr(), br(),
+
+# 📊 Model Performance Comparison Section ----
+div(
+  style = "
+    background-color:#004d00;
+    color:white;
+    padding:20px;
+    border-radius:10px;
+    margin-bottom:25px;
+    box-shadow:0 3px 8px rgba(0,0,0,0.3);
+  ",
+  
+  h3(
+    style = "color:white; font-weight:bold; font-size:20px;",
+    "📈 Model Performance Comparison (RMSE Summary)"
+  ),
+  
+  p(
+    style = "color:white; font-size:15px; line-height:1.5;",
+    "This table compares each model’s Root Mean Squared Error (RMSE), which measures how far the forecasted yield deviates from the actual yield.
+     A lower RMSE indicates higher accuracy:
+     • The 'Conditions Only' model uses weekly USDA crop conditions data.
+     • The 'EDVI Only' model uses satellite vegetation indices.
+     • The 'Conditions + EDVI' model combines both data sources.
+     • The 'ARIMAX' model incorporates time-based yield trends and external predictors."
+  ),
+  
+  uiOutput("model_rmse_table")
+),
+
+
+
+),
+
+
     
     
     
