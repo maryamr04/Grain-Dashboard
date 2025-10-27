@@ -343,55 +343,6 @@ make_forecasts_cond_edvi <- function(year) {
     left_join(soy_annual %>% select(Year, Yield), by = "Year")
 }
 
-make_forecasts_arimax <- function(start_year = 2018, end_year = max(soy_annual$Year)) {
-  results <- list()
-  
-  for (yr in seq(start_year, end_year)) {
-    df_train <- soy_annual %>% filter(Year < yr)
-    df_test  <- soy_annual %>% filter(Year == yr)
-    
-    if (nrow(df_train) < 5 || nrow(df_test) == 0) next
-    
-    y <- ts(df_train$Yield, start = min(df_train$Year), frequency = 1)
-    
-    # Clean regressors
-    xreg_train <- df_train %>%
-      select(mean_EDVI, Excellent, Good, Fair, Poor) %>%
-      mutate(across(everything(), ~ ifelse(is.infinite(.) | is.nan(.) | is.na(.), 0, .))) %>%
-      as.matrix()
-    
-    xreg_test <- df_test %>%
-      select(mean_EDVI, Excellent, Good, Fair, Poor) %>%
-      mutate(across(everything(), ~ ifelse(is.infinite(.) | is.nan(.) | is.na(.), 0, .))) %>%
-      as.matrix()
-    
-    # Drop constant cols
-    valid_cols <- apply(xreg_train, 2, var, na.rm = TRUE) != 0
-    xreg_train <- xreg_train[, valid_cols, drop = FALSE]
-    xreg_test  <- xreg_test[, valid_cols, drop = FALSE]
-    
-    # Fit safely
-    fit <- tryCatch({
-      forecast::auto.arima(y, xreg = xreg_train, seasonal = FALSE)
-    }, error = function(e) NULL)
-    
-    if (is.null(fit)) next
-    
-    fcast <- forecast::forecast(fit, xreg = xreg_test, h = 1)
-    
-    results[[as.character(yr)]] <- tibble(
-      Year     = yr,
-      Actual   = df_test$Yield,
-      Forecast = as.numeric(fcast$mean),
-      Lower    = fcast$lower[, 2],
-      Upper    = fcast$upper[, 2]
-    )
-  }
-  
-  bind_rows(results)
-}
-
-
 # ====================================================================
 # Feedback Helpers
 # ====================================================================

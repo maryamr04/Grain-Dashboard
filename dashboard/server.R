@@ -558,52 +558,8 @@ server <- function(input, output, session) {
     paste("RMSE (Conditions + EDVI model):", round(rmse, 2), "bu/acre")
   })
   
-  # 4️⃣ ARIMAX Forecast
-  output$yield_forecast_arimax_plot <- renderPlotly({
-    df <- make_forecasts_arimax(start_year = 2018, end_year = max(soy_annual$Year))
-    if (is.null(df) || nrow(df) == 0) return(NULL)
-    
-    p <- ggplot(df, aes(x = Year)) +
-      geom_line(aes(y = Actual, color = "Actual Yield"), size = 1.2) +
-      geom_point(aes(y = Actual, color = "Actual Yield")) +
-      
-      geom_line(aes(y = Forecast, color = "ARIMAX Forecast"), size = 1.2) +
-      geom_point(aes(y = Forecast, color = "ARIMAX Forecast"), size = 2) +
-      
-      geom_ribbon(aes(ymin = Lower, ymax = Upper), fill = "lightgreen", alpha = 0.3) +
-      
-      labs(
-        title = "ARIMAX Forecasts (Year-by-Year)",
-        subtitle = "Black = Actual | Green = Forecast + CI",
-        x = "Year", y = "Yield (bu/acre)"
-      ) +
-      scale_color_manual(values = c(
-        "Actual Yield" = "black",
-        "ARIMAX Forecast" = "#228B22"
-      )) +
-      theme_minimal() +
-      theme(
-        plot.title       = element_text(size = 14, face = "bold", color = "#2E7D32"),
-        axis.text.x      = element_text(angle = 45, hjust = 1),
-        panel.background = element_rect(fill = "#F3E5D0", color = NA),
-        plot.background  = element_rect(fill = "#F3E5D0", color = NA),
-        legend.position  = "bottom"
-      )
-    
-    ggplotly(p)
-  })
-  
-  output$yield_forecast_arimax_summary <- renderText({
-    df <- make_forecasts_arimax(start_year = 2018, end_year = max(soy_annual$Year))
-    if (is.null(df) || nrow(df) == 0) return("No data available")
-    
-    rmse <- sqrt(mean((df$Forecast - df$Actual)^2, na.rm = TRUE))
-    
-    paste(
-      "ARIMAX Model RMSE across years:", round(rmse, 2), "bu/acre"
-    )
-  })
-  
+ 
+
   # ================================================================
   # --- Smart Model Comparison Plot (Yearly, model-specific years)
   # ================================================================
@@ -626,11 +582,6 @@ server <- function(input, output, session) {
              Model = "Conditions + EDVI") %>%
       select(Year, Forecast_Yield, Model)
     
-    arimax_df <- make_forecasts_arimax(start_year = 2018, end_year = max(soy_annual$Year)) %>%
-      rename(Forecast_Yield = Forecast) %>%
-      mutate(Model = "ARIMAX") %>%
-      select(Year, Forecast_Yield, Model)
-    
     actual_df <- soy_annual %>% 
       select(Year, Forecast_Yield = Yield) %>%
       mutate(Model = "Actual Yield")
@@ -639,7 +590,7 @@ server <- function(input, output, session) {
       select(Year, Forecast_Yield = Trend_Yield) %>%
       mutate(Model = "Trend Yield")
     
-    combined <- bind_rows(actual_df, trend_df, cond_df, edvi_df, hybrid_df, arimax_df)
+    combined <- bind_rows(actual_df, trend_df, cond_df, edvi_df, hybrid_df)
     
     # 🌿 Nature-inspired color palette
     nature_colors <- c(
@@ -647,8 +598,7 @@ server <- function(input, output, session) {
       "Trend Yield"       = "#6BA292",  # sage green
       "Conditions Only"   = "#A8B545",  # olive green
       "EDVI Only"         = "#5CA4A9",  # teal blue
-      "Conditions + EDVI" = "#D6A75A",  # golden harvest
-      "ARIMAX"            = "#8B4513"   # rich brown
+      "Conditions + EDVI" = "#D6A75A"  # golden harvest
     )
     
     # === Plot ===
@@ -667,8 +617,7 @@ server <- function(input, output, session) {
         "Trend Yield" = "dashed",
         "Conditions Only" = "solid",
         "EDVI Only" = "solid",
-        "Conditions + EDVI" = "solid",
-        "ARIMAX" = "solid"
+        "Conditions + EDVI" = "solid"
       )) +
       # 👇 Force every year to display on x-axis
       scale_x_continuous(breaks = seq(2014, 2025, 1), expand = c(0.01, 0.01)) +
@@ -694,9 +643,6 @@ server <- function(input, output, session) {
   
   
   output$yield_forecast_comparison_summary <- renderText({
-    df_arimax <- make_forecasts_arimax(start_year = 2018, end_year = max(soy_annual$Year))
-    
-    # Calculate RMSE using only overlapping years for fairness
     overlap <- function(pred, actual) {
       shared <- intersect(pred$Year, actual$Year)
       pred <- pred %>% filter(Year %in% shared)
@@ -718,18 +664,15 @@ server <- function(input, output, session) {
       soy_annual %>% mutate(Forecast_Yield = Trend_Yield * (1 + predict(reg_model_cond_edvi, newdata = ., allow.new.levels = TRUE)/100)),
       actual
     )
-    rmse_arimax <- overlap(df_arimax %>% rename(Forecast_Yield = Forecast), actual)
     
     paste0(
       "Model RMSEs — Conditions: ", round(rmse_cond, 2),
       " | EDVI: ", round(rmse_edvi, 2),
-      " | Hybrid: ", round(rmse_hybrid, 2),
-      " | ARIMAX: ", round(rmse_arimax, 2)
+      " | Hybrid: ", round(rmse_hybrid, 2)
     )
   })
   
   output$model_rmse_table <- renderUI({
-    df_arimax <- make_forecasts_arimax(start_year = 2018, end_year = max(soy_annual$Year))
     
     overlap_rmse <- function(pred, actual) {
       shared <- intersect(pred$Year, actual$Year)
@@ -741,52 +684,53 @@ server <- function(input, output, session) {
     actual <- soy_annual %>% select(Year, Yield)
     
     rmse_cond <- overlap_rmse(
-      soy_annual %>% mutate(Forecast_Yield = Trend_Yield *
+      soy_annual %>% mutate(Forecast_Yield = Trend_Yield * 
                               (1 + predict(reg_model_conditions, newdata = ., allow.new.levels = TRUE)/100)),
       actual
     )
     
     rmse_edvi <- overlap_rmse(
-      soy_annual %>% mutate(Forecast_Yield = Trend_Yield *
+      soy_annual %>% mutate(Forecast_Yield = Trend_Yield * 
                               (1 + predict(reg_model_edvi_only, newdata = ., allow.new.levels = TRUE)/100)),
       actual
     )
     
     rmse_hybrid <- overlap_rmse(
-      soy_annual %>% mutate(Forecast_Yield = Trend_Yield *
+      soy_annual %>% mutate(Forecast_Yield = Trend_Yield * 
                               (1 + predict(reg_model_cond_edvi, newdata = ., allow.new.levels = TRUE)/100)),
       actual
     )
     
-    rmse_arimax <- overlap_rmse(
-      df_arimax %>% rename(Forecast_Yield = Forecast),
-      actual
-    )
-    
-    # Build and format the table
     df <- tibble::tibble(
-      Model = c("Conditions Only", "EDVI Only", "Conditions + EDVI", "ARIMAX"),
-      RMSE = round(c(rmse_cond, rmse_edvi, rmse_hybrid, rmse_arimax), 2)
+      Model = c("Conditions Only", "EDVI Only", "Conditions + EDVI"),
+      RMSE = round(c(rmse_cond, rmse_edvi, rmse_hybrid), 2)
     ) %>%
       arrange(RMSE)
     
-    # 🌿 Styled dark-green & white table
+    # 🌿 Styled: dark-green section background, brown + white table
     HTML(
-      df %>%
-        knitr::kable(format = "html", align = "c", col.names = c("Model", "RMSE (bu/acre)")) %>%
-        kableExtra::kable_styling(
-          full_width = FALSE,
-          position = "center",
-          bootstrap_options = c("striped", "hover", "condensed")
-        ) %>%
-        kableExtra::row_spec(0, background = "#004d00", color = "white", bold = TRUE) %>%    
-        kableExtra::row_spec(1:nrow(df), background = "#e8f5e9", color = "black") %>%        
-        kableExtra::column_spec(2, bold = TRUE, color = "#1b5e20")                        
+      paste0(
+        '<div style="background-color:#004d00; padding:20px; border-radius:10px;">',
+        df %>%
+          knitr::kable(format = "html", align = "c",
+                       col.names = c("Model", "RMSE (bu/acre)")) %>%
+          kableExtra::kable_styling(
+            full_width = FALSE,
+            position = "center",
+            bootstrap_options = c("condensed", "hover")
+          ) %>%
+          # 🟤 Table Header: warm brown
+          kableExtra::row_spec(0, background = "#5C4033", color = "white", bold = TRUE) %>%
+          # 🤍 Table Rows: alternating tan & white
+          kableExtra::row_spec(seq(1, nrow(df), 2), background = "#FDFBF7", color = "#3E2C23") %>%
+          kableExtra::row_spec(seq(2, nrow(df), 2), background = "#EADBC8", color = "#3E2C23") %>%
+          # ✏️ Column tweaks
+          kableExtra::column_spec(2, bold = TRUE, color = "#4B2E2B") %>%
+          as.character(),
+        '</div>'
+      )
     )
   })
-  
-    
-    
   
   # ====================================================================
   # Assistant Bot?

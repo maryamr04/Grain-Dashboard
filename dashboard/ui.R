@@ -357,29 +357,6 @@ ui <- fluidPage(
       
       br(), hr(), br(),
       
-      # Model 4
-      h4("Forecast Using ARIMAX (Time-Series + Predictors)"),
-      div(style = "
-     background-color:#4B2E2B;   /* dark brown */
-     color:#FDFBF7;              /* white text */
-     font-family:'Times New Roman', serif;
-     padding:15px;
-     border-radius:8px;
-     margin-bottom:20px;
-     box-shadow:0 3px 8px rgba(0,0,0,0.2);",
-     p("This model goes beyond simple regression by using an ARIMAX approach.
-       ARIMAX combines time-series dynamics (Auto-Regressive Integrated Moving Average)
-       with external predictors such as EDVI and USDA crop condition categories.
-       By incorporating both the historical yield trajectory and yearly predictors,
-       it can capture yield momentum and shocks while adjusting for explanatory variables.
-       This often results in more accurate forecasts compared to models that rely
-       only on trend, conditions, or EDVI.")
-      ),
-     withSpinner(plotlyOutput("yield_forecast_arimax_plot", height = "350px"),
-                 type = 4, color = "#FDFBF7", size = 0.7),
-     textOutput("yield_forecast_arimax_summary"),
-     
-     br(), hr(), br(),
      
      h4("🌾 Model Comparison: All Forecasting Approaches (2014–2025)"),
      
@@ -393,7 +370,7 @@ ui <- fluidPage(
   box-shadow:0 3px 8px rgba(0,0,0,0.2);
 ",
 p("This visualization compares all four forecasting models — Conditions-only, EDVI-only, 
-   Conditions + EDVI, and ARIMAX — alongside the actual and trend yields."),
+   Conditions + EDVI"),
 p("Each model covers its valid data years, but the timeline displays all years (2014–2025) 
    for easier comparison."),
 tags$ul(
@@ -401,8 +378,7 @@ tags$ul(
   tags$li("🟦 Blue dashed line = Trend yield"),
   tags$li("🟩 Green line = Conditions-only forecast"),
   tags$li("🟦 Teal line = EDVI-only forecast"),
-  tags$li("🟧 Orange line = Hybrid forecast (Conditions + EDVI)"),
-  tags$li("🟥 Brown line = ARIMAX forecast (time-series)")
+  tags$li("🟧 Orange line = Hybrid forecast (Conditions + EDVI)")
 )
      ),
 
@@ -437,8 +413,7 @@ div(
      A lower RMSE indicates higher accuracy:
      • The 'Conditions Only' model uses weekly USDA crop conditions data.
      • The 'EDVI Only' model uses satellite vegetation indices.
-     • The 'Conditions + EDVI' model combines both data sources.
-     • The 'ARIMAX' model incorporates time-based yield trends and external predictors."
+     • The 'Conditions + EDVI' model combines both data sources."
   ),
   
   uiOutput("model_rmse_table")
@@ -448,9 +423,6 @@ div(
 
 ),
 
-
-    
-    
     
     tabPanel("Feedback / FAQ",
              h3("💬 Feedback Form"),
