@@ -331,33 +331,48 @@ navlistPanel(
         Green/orange dotted lines represent forecasts from each model.
         The comparison highlights whether adding EDVI improves accuracy over conditions alone."),
       
-      # Model 1
-      h4("Forecast Using Crop Conditions Only"),
-      selectInput("year_forecast_conditions", "Select Year (Conditions):",
-                  choices = sort(unique(soy_annual$Year)), selected = 2024),
-      withSpinner(plotlyOutput("yield_forecast_conditions_plot", height = "350px"),
-                  type = 4, color = "#FDFBF7", size = 0.7),
-      textOutput("yield_forecast_conditions_summary"),
+
+      # ======= Two Forecast Models Side-by-Side (Conditions + Hybrid) =======
       
-      br(), hr(), br(),
-      
-      # Model 2
-      h4("Forecast Using EDVI Only"),
-      selectInput("year_forecast_edvi", "Select Year (EDVI):",
-                  choices = sort(unique(soy_annual$Year)), selected = 2024),
-      withSpinner(plotlyOutput("yield_forecast_edvi_only_plot", height = "350px"),
-                  type = 4, color = "#FDFBF7", size = 0.7),
-      textOutput("yield_forecast_edvi_only_summary"),
-      
-      br(), hr(), br(),
-      
-      # Model 3
-      h4("Forecast Using Conditions + EDVI"),
-      selectInput("year_forecast_cond_edvi", "Select Year (Conditions + EDVI):",
-                  choices = sort(unique(soy_annual$Year)), selected = 2024),
-      withSpinner(plotlyOutput("yield_forecast_cond_edvi_plot", height = "350px"),
-                  type = 4, color = "#FDFBF7", size = 0.7),
-      textOutput("yield_forecast_cond_edvi_summary"),
+      fluidRow(
+        column(
+          width = 6,
+          div(style = "background-color:#4B2E2B; padding:12px; border-radius:10px;
+                box-shadow:0 3px 8px rgba(0,0,0,0.2);
+                margin-bottom:25px; min-height:400px;",
+              h4("Forecast Using Crop Conditions Only",
+                 style = "color:#FDFBF7; font-family:'Times New Roman'; font-weight:bold; margin-top:5px;"),
+              selectInput("year_forecast_conditions", NULL,
+                          choices = sort(unique(soy_annual$Year)), selected = 2024),
+              withSpinner(
+                plotlyOutput("yield_forecast_conditions_plot",
+                             height = "320px", width = "100%"),
+                type = 4, color = "#FDFBF7", size = 0.8
+              ),
+              div(style = "color:#FDFBF7; font-size:13px;",
+                  textOutput("yield_forecast_conditions_summary"))
+          )
+        ),
+        
+        column(
+          width = 6,
+          div(style = "background-color:#4B2E2B; padding:12px; border-radius:10px;
+                box-shadow:0 3px 8px rgba(0,0,0,0.2);
+                margin-bottom:25px; min-height:400px;",
+              h4("Forecast Using Conditions + EDVI (Hybrid)",
+                 style = "color:#FDFBF7; font-family:'Times New Roman'; font-weight:bold; margin-top:5px;"),
+              selectInput("year_forecast_cond_edvi", NULL,
+                          choices = sort(unique(soy_annual$Year)), selected = 2024),
+              withSpinner(
+                plotlyOutput("yield_forecast_cond_edvi_plot",
+                             height = "320px", width = "100%"),
+                type = 4, color = "#FDFBF7", size = 0.8
+              ),
+              div(style = "color:#FDFBF7; font-size:13px;",
+                  textOutput("yield_forecast_cond_edvi_summary"))
+          )
+        )
+      ),
       
       br(), hr(), br(),
       
