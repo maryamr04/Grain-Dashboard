@@ -1,7 +1,11 @@
 # ====================================================================
 # ui.R
 # ====================================================================
+source("functions.R")
 library(shiny)
+library(leaflet)
+library(rnassqs)
+nassqs_auth(key = "E4A8F7DF-7324-371D-A735-4F0FBC2629EE")
 library(plotly)
 library(shinycssloaders)
 library(tidyr)
@@ -9,7 +13,7 @@ library(kableExtra)
 
 
 years <- 2014:2025
-categories <- c("PCT PLANTED", "PCT EMERGED", "PCT BLOOMING",
+progress_categories <- c("PCT PLANTED", "PCT EMERGED", "PCT BLOOMING",
                 "PCT SETTING PODS", "PCT DROPPING LEAVES", "PCT HARVESTED")
 
 # ====================================================================
@@ -88,33 +92,33 @@ ui <- fluidPage(
       }
       
   "))),
+
+# ====================================================================
+#  Title Section
+# ====================================================================
+div(class = "title-box",
+    h1("🌱 Soybean Interactive Dashboard"),
+    h4("A tool brought to you by the Virginia Tech Kohl Centre")
+),
+
+# ====================================================================
+#  Sidebar Navigation
+# ====================================================================
+navlistPanel(
+  widths = c(2, 10),
   
-  # ====================================================================
-  #  Title Section
-  # ====================================================================
-  div(class = "title-box",
-      h1("🌱 Soybean Interactive Dashboard"),
-      h4("A tool brought to you by the Virginia Tech Kohl Centre")
+  # ---- Objective Tab ----
+  tabPanel("Objective",
+           h2("🌱 Welcome"),
+           p("Explore soybean planting progress (2013–2025) across stages, 
+                compared to 5-year averages. Data is from the USDA NASS API.")
   ),
   
-  # ====================================================================
-  #  Sidebar Navigation
-  # ====================================================================
-  navlistPanel(
-    widths = c(2, 10),
-    
-    # ---- Objective Tab ----
-    tabPanel("Objective",
-             h2("🌱 Welcome"),
-             p("Explore soybean planting progress (2013–2025) across stages, 
-                compared to 5-year averages. Data is from the USDA NASS API.")
-    ),
-    
-    # ---- Planting Progress Tab ----
-    tabPanel("Planting Progress",
-             h3("Soybean Planting Progress"),
-             
-             div(style = "
+  # ---- Planting Progress Tab ----
+  tabPanel("Planting Progress",
+           h3("Soybean Planting Progress"),
+           
+           div(style = "
         background-color:#4B2E2B;
         color:#FDFBF7;
         font-family:'Times New Roman', serif;
@@ -126,7 +130,7 @@ ui <- fluidPage(
       h4("About this Data"),
       p("This dashboard uses soybean planting progress and crop development data 
          from USDA NASS. Percentages represent the share of soybean acres at each growth stage in Virginia.")
-             ),
+           ),
       
       # Year selector
       selectInput("year_sel", "Select Year:",
@@ -144,13 +148,13 @@ ui <- fluidPage(
           br()
         )
       })
-    ),
-    
-    
-    # ---- Crop Conditions Tab ----
-    tabPanel("Crop Conditions",
-             h3("Soybean Crop Conditions"),
-             div(style = "
+  ),
+  
+  
+  # ---- Crop Conditions Tab ----
+  tabPanel("Crop Conditions",
+           h3("Soybean Crop Conditions"),
+           div(style = "
          background-color:#4B2E2B;
          color:#FDFBF7;
          font-family:'Times New Roman', serif;
@@ -163,7 +167,7 @@ ui <- fluidPage(
        p("Soybean crop conditions (2013–2025) are pulled from the USDA NASS API. 
           Categories include Very Poor, Poor, Fair, Good, and Excellent. 
           Percentages represent the share of soybean acres in each condition.")
-             ),
+           ),
        
        # User Control
        selectInput("year_sel_conditions", "Select Year:", choices = years, selected = 2025),
@@ -173,12 +177,12 @@ ui <- fluidPage(
          plotlyOutput("plot_conditions", height = "400px"),
          type = 4, color = "#FDFBF7", size = 0.7
        )
-    ),
-    
-    # ---- County Analysis Tab ----
-    tabPanel("County Analysis",
-             h3("County-Level Soybean Analysis"),
-             div(style = "
+  ),
+  
+  # ---- County Analysis Tab ----
+  tabPanel("County Analysis",
+           h3("County-Level Soybean Analysis"),
+           div(style = "
            background-color:#4B2E2B;
            color:#FDFBF7;
            font-family:'Times New Roman', serif;
@@ -191,7 +195,7 @@ ui <- fluidPage(
          p("This section compares soybean acres planted, harvested, 
             and harvest success rates (2014–2024 CSV, 2025 API in future). 
             Select a state and one or more counties to visualize trends over time.")
-             ),
+           ),
          
          # State + County selectors
          selectInput("state_sel", "Select State:", choices = unique(soy_county$State)),
@@ -220,12 +224,12 @@ ui <- fluidPage(
            leafletOutput("county_map", height = "500px"),   # <-- FIXED
            type = 4, color = "#FDFBF7", size = 0.7 )
          
-    ),
-    
-    # ---- Remote Sensing Trends Tab ----
-    tabPanel("Remote Sensing Data",
-             h3("Soybean Enhanced Difference Vegetation Index (EDVI)"),
-             div(style = "
+  ),
+  
+  # ---- Remote Sensing Trends Tab ----
+  tabPanel("Remote Sensing Data",
+           h3("Soybean Enhanced Difference Vegetation Index (EDVI)"),
+           div(style = "
         background-color:#4B2E2B;
         color:#FDFBF7;
         font-family:'Times New Roman', serif;
@@ -241,7 +245,7 @@ ui <- fluidPage(
       p("EDVI = (NIR - RED) / sqrt(NIR + RED)"),
       p("Higher EDVI values indicate greener, healthier vegetation. 
          This plot shows weekly county-level averages for Virginia soybeans (2013–2025).")
-             ),
+           ),
       
       # EDVI controls + plot
       selectInput("edvi_year", "Select Year:", 2013:2025, selected = 2025),
@@ -280,13 +284,13 @@ ui <- fluidPage(
         plotlyOutput("ndvi_plot", height = "500px"),
         type = 4, color = "#FDFBF7", size = 0.7
       )
-    ),
-    
-    # ---- Yield Forecast Tab ----
-    tabPanel("Yield Forecasts",
-             h3("Soybean Yield Forecasts"),
-             
-             div(style = "
+  ),
+  
+  # ---- Yield Forecast Tab ----
+  tabPanel("Yield Forecasts",
+           h3("Soybean Yield Forecasts"),
+           
+           div(style = "
       background-color:#4B2E2B;
       color:#FDFBF7;
       font-family:'Times New Roman', serif;
@@ -320,7 +324,7 @@ ui <- fluidPage(
           into a single regression model. Steps:"
         )
       )
-             ),
+           ),
       
       p("Dashed red lines represent actual USDA-reported yields.
         Solid blue lines indicate the long-term trend.
@@ -357,10 +361,10 @@ ui <- fluidPage(
       
       br(), hr(), br(),
       
-     
-     h4("🌾 Model Comparison: All Forecasting Approaches (2014–2025)"),
-     
-     div(style = "
+      
+      h4("🌾 Model Comparison: All Forecasting Approaches (2014–2025)"),
+      
+      div(style = "
   background-color:#4B2E2B;
   color:#FDFBF7;
   font-family:'Times New Roman', serif;
@@ -380,7 +384,7 @@ tags$ul(
   tags$li("🟦 Teal line = EDVI-only forecast"),
   tags$li("🟧 Orange line = Hybrid forecast (Conditions + EDVI)")
 )
-     ),
+      ),
 
 withSpinner(
   plotlyOutput("yield_forecast_comparison_plot", height = "450px", width = "100%"),
@@ -421,27 +425,26 @@ div(
 
 
 
+  ),
+
+
+tabPanel("Feedback / FAQ",
+         h3("💬 Feedback Form"),
+         textInput("user_name", "Your Name (optional):"),
+         textAreaInput("user_feedback", "Your Feedback:", "", width = "100%", height = "120px"),
+         actionButton("submit_feedback", "Submit"),
+         br(), br(),
+         textOutput("feedback_message"),
+         hr(),
+         
+         h3("📖 FAQ"),
+         selectInput("faq_question", "Choose a question:", 
+                     choices = names(faq_answers), selected = names(faq_answers)[1]),
+         textOutput("faq_answer")
 ),
 
-    
-    tabPanel("Feedback / FAQ",
-             h3("💬 Feedback Form"),
-             textInput("user_name", "Your Name (optional):"),
-             textAreaInput("user_feedback", "Your Feedback:", "", width = "100%", height = "120px"),
-             actionButton("submit_feedback", "Submit"),
-             br(), br(),
-             textOutput("feedback_message"),
-             hr(),
-             
-             h3("📖 FAQ"),
-             selectInput("faq_question", "Choose a question:", 
-                         choices = names(faq_answers), selected = names(faq_answers)[1]),
-             textOutput("faq_answer")
-    ),
-    
-    
-    # ---- Placeholder Tabs ----
-    tabPanel("About this data",           h3("ℹ️ About (Placeholder)"))
-  )
-)
 
+# ---- Placeholder Tabs ----
+tabPanel("About this data",           h3("ℹ️ About (Placeholder)"))
+)
+)

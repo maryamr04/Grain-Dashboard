@@ -384,4 +384,3 @@ faq_answers <- list(
   "What years are forecasts available for?" =
     "Forecasts are built for 2014–2024 (historical actual vs. forecast) and 2025 (live conditions, no actual yield yet)."
 )
-

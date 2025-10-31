@@ -1,0 +1,5 @@
+# Disable renv and dependency snapshotting
+^renv$
+^renv\.lock$
+^rsconnect$
+^packrat$

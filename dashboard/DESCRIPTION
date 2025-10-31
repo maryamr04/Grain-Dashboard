@@ -1,13 +1,22 @@
-Package: grain
+Package: grainDashboard
 Type: Shiny
 Title: Grain Dashboard
-Version: 0.0.1
+Version: 1.0
+Author: Maryam Rehmatulla
+Description: Shiny dashboard for grain and soybean analytics using USDA NASS and geospatial data.
 Imports:
     shiny,
-    leaflet,
-    plotly,
-    dplyr,
     tidyr,
-    readr,
+    rnassqs,
+    leaflet,
+    dplyr,
     sf,
-    shinycssloaders
+    tigris,
+    plotly,
+    shinycssloaders,
+    kableExtra,
+    ggplot2,
+    lubridate
+Encoding: UTF-8
+LazyData: true
+

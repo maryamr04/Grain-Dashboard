@@ -1,0 +1,12 @@
+name: dashboard
+title: dashboard
+username: maryamr04
+account: maryamr04
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 15897749
+bundleId:
+url: https://maryamr04.shinyapps.io/dashboard/
+version: 1
+asMultiple: FALSE
+asStatic: FALSE

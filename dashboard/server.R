@@ -38,7 +38,7 @@ server <- function(input, output, session) {
                         Type)
             
             combined <- bind_rows(actual, avg)
-          
+            
           } else if (input$year_sel == 2025) {
             # For 2025, only API Actuals
             combined <- get_soy_progress_data(input$year_sel, category_inner)
@@ -264,13 +264,13 @@ server <- function(input, output, session) {
           setView(lng = -78.6569, lat = 37.5, zoom = 6)
       )
     }
-
+    
     map_data <- left_join(
       all_counties,
       df,  
       by = c("County", "State")
     ) %>% st_as_sf()
-
+    
     
     pal <- colorBin(
       palette = c("#8B4513", "#DEB887", "#228B22"),  # earthy: brown → tan → green
@@ -503,14 +503,14 @@ server <- function(input, output, session) {
         "Forecast (EDVI)" = "lightgreen",
         "Forecast (G+E)" = "brown"
       )) +
-    theme_minimal() +
-    theme(
-      plot.title       = element_text(size = 14, face = "bold", color = "#2E7D32"),
-      axis.text.x      = element_text(angle = 45, hjust = 1),
-      panel.background = element_rect(fill = "#F3E5D0", color = NA),
-      plot.background  = element_rect(fill = "#F3E5D0", color = NA),
-      legend.position  = "bottom"
-    )
+      theme_minimal() +
+      theme(
+        plot.title       = element_text(size = 14, face = "bold", color = "#2E7D32"),
+        axis.text.x      = element_text(angle = 45, hjust = 1),
+        panel.background = element_rect(fill = "#F3E5D0", color = NA),
+        plot.background  = element_rect(fill = "#F3E5D0", color = NA),
+        legend.position  = "bottom"
+      )
     
     ggplotly(p)
   })
@@ -558,8 +558,8 @@ server <- function(input, output, session) {
     paste("RMSE (Conditions + EDVI model):", round(rmse, 2), "bu/acre")
   })
   
- 
-
+  
+  
   # ================================================================
   # --- Smart Model Comparison Plot (Yearly, model-specific years)
   # ================================================================
@@ -779,4 +779,3 @@ server <- function(input, output, session) {
   
   
 }
-

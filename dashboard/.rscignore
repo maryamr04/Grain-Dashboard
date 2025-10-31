@@ -1,0 +1,5 @@
+# Ignore renv and packrat so rsconnect doesn't trigger snapshot
+^renv$
+^renv\.lock$
+^packrat$
+^rsconnect$
