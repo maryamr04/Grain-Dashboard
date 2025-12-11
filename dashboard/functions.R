@@ -261,6 +261,30 @@ get_soy_ndvi <- function(year, counties = NULL) {
 # Yield Forecast Functions
 # ====================================================================
 
+# ====================================================================
+# G+E Forecast
+# ====================================================================
+
+soy_ge <- read.csv("GE.csv", stringsAsFactors = FALSE) %>%
+  mutate(
+    Year           = as.integer(Year),
+    Week           = as.character(Week),
+    GE_percent     = as.numeric(GE_percent),
+    Trend_Yield    = as.numeric(Trend_Yield),
+    Dev_From_Trend = as.numeric(gsub("%", "", Dev_From_Trend)),
+    Forecast_Yield = as.numeric(Forecast_Yield)
+  )
+
+
+make_forecasts_GE <- function(year) {
+  df <- soy_ge %>% filter(Year == year)
+  if (nrow(df) == 0) return(NULL)
+  return(df)
+}
+
+
+
+
 data_file <- "soybean_yield_forecast_data.xlsx"
 
 # ---- Annual Data ----

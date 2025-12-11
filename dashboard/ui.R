@@ -374,8 +374,6 @@ navlistPanel(
         )
       ),
       
-      br(), hr(), br(),
-      
       
       h4("🌾 Model Comparison: All Forecasting Approaches (2014–2025)"),
       
@@ -389,7 +387,7 @@ navlistPanel(
   box-shadow:0 3px 8px rgba(0,0,0,0.2);
 ",
 p("This visualization compares all four forecasting models — Conditions-only, EDVI-only, 
-   Conditions + EDVI"),
+   Conditions + EDVI, and G + E"),
 p("Each model covers its valid data years, but the timeline displays all years (2014–2025) 
    for easier comparison."),
 tags$ul(
@@ -397,7 +395,9 @@ tags$ul(
   tags$li("🟦 Blue dashed line = Trend yield"),
   tags$li("🟩 Green line = Conditions-only forecast"),
   tags$li("🟦 Teal line = EDVI-only forecast"),
-  tags$li("🟧 Orange line = Hybrid forecast (Conditions + EDVI)")
+  tags$li("🟧 Orange line = Hybrid forecast (Conditions + EDVI)"),
+  tags$li("🤎 Brown line = G+E forecast")
+  
 )
       ),
 
@@ -426,13 +426,13 @@ div(
     "📈 Model Performance Comparison (RMSE Summary)"
   ),
   
-  p(
-    style = "color:white; font-size:15px; line-height:1.5;",
-    "This table compares each model’s Root Mean Squared Error (RMSE), which measures how far the forecasted yield deviates from the actual yield.
-     A lower RMSE indicates higher accuracy:
-     • The 'Conditions Only' model uses weekly USDA crop conditions data.
-     • The 'EDVI Only' model uses satellite vegetation indices.
-     • The 'Conditions + EDVI' model combines both data sources."
+  p("This table compares each model’s Root Mean Squared Error (RMSE), which measures how far 
+  the forecasted yield deviates from the actual yield. A lower RMSE indicates higher accuracy:
+  • The 'Conditions Only' model uses weekly USDA crop conditions data.
+  • The 'EDVI Only' model uses satellite vegetation indices.
+  • The 'Conditions + EDVI' model combines both data sources.
+  • The 'G+E ' model uses the Good + Excellent percentage to estimate yearly deviation 
+    from trend and back-solve forecast yield."
   ),
   
   uiOutput("model_rmse_table")

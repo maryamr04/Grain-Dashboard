@@ -430,6 +430,8 @@ server <- function(input, output, session) {
   # Yield Forecasts (Server)
   # ====================================================================
   
+ 
+  
   # 1️⃣ Conditions-only
   output$yield_forecast_conditions_plot <- renderPlotly({
     req(input$year_forecast_conditions)
@@ -590,7 +592,15 @@ server <- function(input, output, session) {
       select(Year, Forecast_Yield = Trend_Yield) %>%
       mutate(Model = "Trend Yield")
     
-    combined <- bind_rows(actual_df, trend_df, cond_df, edvi_df, hybrid_df)
+    # === Mario G+E Model (from precomputed CSV) ===
+    ge_df <- soy_ge %>%
+      group_by(Year) %>%
+      summarise(Forecast_Yield = mean(Forecast_Yield, na.rm = TRUE)) %>% 
+      mutate(Model = "G+E") %>%
+      ungroup()
+    
+    combined <- bind_rows(actual_df, trend_df, cond_df, edvi_df, hybrid_df, ge_df)
+  
     
     # 🌿 Nature-inspired color palette
     nature_colors <- c(
@@ -598,7 +608,9 @@ server <- function(input, output, session) {
       "Trend Yield"       = "#6BA292",  # sage green
       "Conditions Only"   = "#A8B545",  # olive green
       "EDVI Only"         = "#5CA4A9",  # teal blue
-      "Conditions + EDVI" = "#D6A75A"  # golden harvest
+      "Conditions + EDVI" = "#D6A75A", # golden harvest
+      "G+E" = "#C67C48"   # warm brown / copper
+      
     )
     
     # === Plot ===
@@ -643,33 +655,45 @@ server <- function(input, output, session) {
   
   
   output$yield_forecast_comparison_summary <- renderText({
-    overlap <- function(pred, actual) {
+    overlap_2<- function(pred, actual) {
       shared <- intersect(pred$Year, actual$Year)
       pred <- pred %>% filter(Year %in% shared)
       actual <- actual %>% filter(Year %in% shared)
       sqrt(mean((pred$Forecast_Yield - actual$Yield)^2, na.rm = TRUE))
     }
     
+    
     actual <- soy_annual %>% select(Year, Yield)
     
-    rmse_cond <- overlap(
+    rmse_cond <- overlap_2(
       soy_annual %>% mutate(Forecast_Yield = Trend_Yield * (1 + predict(reg_model_conditions, newdata = ., allow.new.levels = TRUE)/100)),
       actual
     )
-    rmse_edvi <- overlap(
+    rmse_edvi <- overlap_2(
       soy_annual %>% mutate(Forecast_Yield = Trend_Yield * (1 + predict(reg_model_edvi_only, newdata = ., allow.new.levels = TRUE)/100)),
       actual
     )
-    rmse_hybrid <- overlap(
+    rmse_hybrid <- overlap_2(
       soy_annual %>% mutate(Forecast_Yield = Trend_Yield * (1 + predict(reg_model_cond_edvi, newdata = ., allow.new.levels = TRUE)/100)),
       actual
     )
     
+    rmse_ge <- overlap_2(
+      soy_ge %>% 
+        group_by(Year) %>% 
+        summarise(Forecast_Yield = mean(Forecast_Yield, na.rm = TRUE)),
+      actual
+    )
+    
+    
+    
     paste0(
       "Model RMSEs — Conditions: ", round(rmse_cond, 2),
       " | EDVI: ", round(rmse_edvi, 2),
-      " | Hybrid: ", round(rmse_hybrid, 2)
+      " | Hybrid: ", round(rmse_hybrid, 2),
+      " | G+E (Mario): ", round(rmse_ge, 2)
     )
+    
   })
   
   output$model_rmse_table <- renderUI({
@@ -701,10 +725,21 @@ server <- function(input, output, session) {
       actual
     )
     
+    rmse_ge <- overlap_rmse(
+      soy_ge %>%
+        group_by(Year) %>%
+        summarise(Forecast_Yield = mean(Forecast_Yield, na.rm = TRUE)),
+      actual
+    )
+    
+    
+    
+  
+    
     df <- tibble::tibble(
-      Model = c("Conditions Only", "EDVI Only", "Conditions + EDVI"),
-      RMSE = round(c(rmse_cond, rmse_edvi, rmse_hybrid), 2)
-    ) %>%
+      Model = c("Conditions Only", "EDVI Only", "Conditions + EDVI", "G+E"),
+      RMSE  = round(c(rmse_cond, rmse_edvi, rmse_hybrid, rmse_ge), 2)
+    )%>%
       arrange(RMSE)
     
     # 🌿 Styled: dark-green section background, brown + white table
